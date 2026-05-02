@@ -1,30 +1,26 @@
-from typing import List
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Hirix AI"
-    ENVIRONMENT: str = "development"
-    
-    # API Settings
-    CORS_ORIGINS: List[str] = ["*"]
-    
-    # Database Settings
-    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/hirix"
-    
-    # AI Settings
-    OPENAI_API_KEY: str = ""
-    ANTHROPIC_API_KEY: str = ""
-    
-    # Vector DB Settings
-    PINECONE_API_KEY: str = ""
-    PINECONE_ENVIRONMENT: str = ""
-    
-    # Messaging
-    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
-    
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    # App
+    APP_NAME: str = "Hirix Recruitment API"
+    DEBUG: bool = False
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # Database
+    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/hirix"
+
+    # JWT
+    SECRET_KEY: str = "change-this-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+
+    # CORS
+    ALLOWED_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
+
+    class Config:
+        env_file = ".env"
+        extra = "allow"
 
 settings = Settings()

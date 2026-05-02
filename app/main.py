@@ -1,39 +1,34 @@
-import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from app.config import settings
+from app.api.v1.auth import router as auth_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Hirix AI Recruitment Platform",
-        description="9-Layer Hexagonal + DDD + Event-Driven Backend",
+        title=settings.APP_NAME,
+        description="AI-Driven Recruitment Platform — Hexagonal + DDD + Event-Driven",
         version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
 
-    # Configure CORS
+    # ─── CORS ─────────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=settings.ALLOWED_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    @app.get("/health")
-    async def health_check():
-        return {"status": "healthy", "version": "0.1.0"}
+    # ─── Routers ──────────────────────────────────────────────────────────────
+    app.include_router(auth_router, prefix="/api/v1")
 
-    # TODO: Mount Routers (L2 Adapters)
-    # app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
-    
+    @app.get("/health", tags=["Health"])
+    async def health_check():
+        return {"status": "ok", "app": settings.APP_NAME}
+
     return app
 
 app = create_app()
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
