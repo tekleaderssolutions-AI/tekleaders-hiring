@@ -64,6 +64,14 @@ class PostgresJobRepository(JobRepository):
         )
 
     async def create(self, job: Job) -> Job:
+        if not job.job_code:
+            # Auto-generate a job code based on the number of jobs in the company
+            from sqlalchemy.sql import func
+            count_query = select(func.count()).select_from(JobModel).where(JobModel.company_id == job.company_id)
+            result = await self.session.execute(count_query)
+            count = result.scalar() or 0
+            job.job_code = f"TEK-{count + 1:03d}"
+
         db_job = self._to_model(job)
         self.session.add(db_job)
         await self.session.commit()
