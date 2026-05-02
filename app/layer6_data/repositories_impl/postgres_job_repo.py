@@ -10,28 +10,31 @@ class PostgresJobRepository(JobRepository):
         self.session = session
 
     def _to_entity(self, model: JobModel) -> Job:
+        def get_val(v):
+            return v.value if hasattr(v, "value") else v
+
         return Job(
             id=model.id,
             title=model.title,
             description=model.description,
-            employment_type=model.employment_type.value if model.employment_type else None,
-            experience_level=model.experience_level.value if model.experience_level else None,
+            employment_type=get_val(model.employment_type) if model.employment_type else None,
+            experience_level=get_val(model.experience_level) if model.experience_level else None,
             company_id=model.company_id,
             created_by=model.created_by,
             job_code=model.job_code,
             department=model.department,
-            workplace_type=model.workplace_type.value if model.workplace_type else None,
+            workplace_type=get_val(model.workplace_type) if model.workplace_type else None,
             location=model.location,
             requirements=model.requirements,
             benefits=model.benefits,
-            industry=model.industry.value if model.industry else None,
-            job_function=model.job_function.value if model.job_function else None,
-            education_level=model.education_level.value if model.education_level else None,
+            industry=get_val(model.industry) if model.industry else None,
+            job_function=get_val(model.job_function) if model.job_function else None,
+            education_level=get_val(model.education_level) if model.education_level else None,
             keywords=model.keywords,
             salary_min=model.salary_min,
             salary_max=model.salary_max,
             salary_currency=model.salary_currency,
-            status=model.status.value if model.status else None,
+            status=get_val(model.status) if model.status else None,
             published_at=model.published_at,
             closed_at=model.closed_at,
             created_at=model.created_at,
