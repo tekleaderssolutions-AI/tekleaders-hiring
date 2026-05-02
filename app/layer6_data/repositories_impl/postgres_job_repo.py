@@ -69,8 +69,7 @@ class PostgresJobRepository(JobRepository):
 
         db_job = self._to_model(job)
         self.session.add(db_job)
-        await self.session.commit()
-        await self.session.refresh(db_job)
+        await self.session.flush()
         return self._to_entity(db_job)
 
     async def get_by_id(self, job_id: str) -> Optional[Job]:
@@ -108,8 +107,7 @@ class PostgresJobRepository(JobRepository):
             db_job.salary_currency = job.salary_currency
             db_job.status = job.status
             
-            await self.session.commit()
-            await self.session.refresh(db_job)
+            await self.session.flush()
             return self._to_entity(db_job)
         raise ValueError("Job not found")
 

@@ -37,8 +37,7 @@ async def create_job(
         current_user.company_id = company_id
         user_repo = PostgresUserRepository(db)
         await user_repo.update(current_user)
-        
-        await db.commit()
+        # Transactions are managed by get_db dependency (session.begin())
 
     job_repo = PostgresJobRepository(db)
     use_case = CreateJobUseCase(job_repo=job_repo)
