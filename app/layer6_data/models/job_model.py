@@ -13,23 +13,55 @@ class JobStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 class EmploymentType(str, enum.Enum):
-    FULL_TIME = "full_time"
-    PART_TIME = "part_time"
-    CONTRACT = "contract"
-    INTERNSHIP = "internship"
-    FREELANCE = "freelance"
+    FULL_TIME = "Full-time"
+    PART_TIME = "Part-time"
+    CONTRACT = "Contract"
+    INTERNSHIP = "Internship"
 
 class ExperienceLevel(str, enum.Enum):
-    ENTRY = "entry"
-    MID = "mid"
-    SENIOR = "senior"
-    LEAD = "lead"
-    EXECUTIVE = "executive"
+    ENTRY_LEVEL = "Entry Level"
+    MID_LEVEL = "Mid Level"
+    SENIOR_LEVEL = "Senior Level"
+    DIRECTOR = "Director"
+    EXECUTIVE = "Executive"
+    INTERNSHIP = "Internship"
 
 class WorkplaceType(str, enum.Enum):
     ON_SITE = "on_site"
     HYBRID = "hybrid"
     REMOTE = "remote"
+
+class CompanyIndustry(str, enum.Enum):
+    TECHNOLOGY = "Technology"
+    HEALTHCARE = "Healthcare"
+    FINANCE = "Finance"
+    EDUCATION = "Education"
+    MANUFACTURING = "Manufacturing"
+    RETAIL = "Retail"
+    CONSULTING = "Consulting"
+    ENERGY = "Energy"
+    MEDIA_ENTERTAINMENT = "Media & Entertainment"
+    REAL_ESTATE = "Real Estate"
+
+class JobFunction(str, enum.Enum):
+    ENGINEERING = "Engineering"
+    PRODUCT_MANAGEMENT = "Product Management"
+    DESIGN = "Design"
+    SALES = "Sales"
+    MARKETING = "Marketing"
+    HUMAN_RESOURCES = "Human Resources"
+    FINANCE = "Finance"
+    LEGAL = "Legal"
+    OPERATIONS = "Operations"
+    CUSTOMER_SUPPORT = "Customer Support"
+
+class EducationLevel(str, enum.Enum):
+    HIGH_SCHOOL = "High School"
+    ASSOCIATES = "Associate's Degree"
+    BACHELORS = "Bachelor's Degree"
+    MASTERS = "Master's Degree"
+    PHD = "PhD"
+    NONE = "None"
 
 class JobModel(Base):
     __tablename__ = "jobs"
@@ -53,13 +85,13 @@ class JobModel(Base):
     benefits = Column(Text, nullable=True)
     
     # 4. Industry & Function
-    company_industry = Column(String, nullable=True)
-    job_function = Column(String, nullable=True)
+    company_industry = Column(Enum(CompanyIndustry), nullable=True)
+    job_function = Column(Enum(JobFunction), nullable=True)
     
     # 5. Employment details
     employment_type = Column(Enum(EmploymentType), nullable=False)
     experience_level = Column(Enum(ExperienceLevel), nullable=False)
-    education = Column(String, nullable=True)
+    education = Column(Enum(EducationLevel), nullable=True)
     keywords = Column(JSON, nullable=True) # Replaces required_skills to match UI
     
     # 6. Annual salary

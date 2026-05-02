@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from app.layer6_data.models.job_model import EmploymentType, ExperienceLevel, WorkplaceType, JobStatus
+from app.layer6_data.models.job_model import EmploymentType, ExperienceLevel, WorkplaceType, JobStatus, CompanyIndustry, JobFunction, EducationLevel
 
 class JobCreate(BaseModel):
     title: str = Field(..., max_length=80)
@@ -15,12 +15,12 @@ class JobCreate(BaseModel):
     requirements: Optional[str] = None
     benefits: Optional[str] = None
     
-    company_industry: Optional[str] = None
-    job_function: Optional[str] = None
+    company_industry: Optional[CompanyIndustry] = None
+    job_function: Optional[JobFunction] = None
     
     employment_type: EmploymentType
     experience_level: ExperienceLevel
-    education: Optional[str] = None
+    education: Optional[EducationLevel] = None
     keywords: Optional[List[str]] = []
     
     salary_min: Optional[int] = None
@@ -37,11 +37,11 @@ class JobUpdate(BaseModel):
     description: Optional[str] = None
     requirements: Optional[str] = None
     benefits: Optional[str] = None
-    company_industry: Optional[str] = None
-    job_function: Optional[str] = None
+    company_industry: Optional[CompanyIndustry] = None
+    job_function: Optional[JobFunction] = None
     employment_type: Optional[EmploymentType] = None
     experience_level: Optional[ExperienceLevel] = None
-    education: Optional[str] = None
+    education: Optional[EducationLevel] = None
     keywords: Optional[List[str]] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
