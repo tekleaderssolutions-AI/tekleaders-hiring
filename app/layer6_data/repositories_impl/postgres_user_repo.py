@@ -34,7 +34,9 @@ class PostgresUserRepository(UserRepository):
             first_name=user.first_name,
             last_name=user.last_name,
             google_id=user.google_id,
-            is_active=user.is_active
+            is_active=user.is_active,
+            company_id=user.company_id,
+            role=user.role
         )
         self.session.add(user_model)
         await self.session.flush()
@@ -42,8 +44,13 @@ class PostgresUserRepository(UserRepository):
         return user
 
     async def update(self, user: User) -> User:
-        # Implementation for update
-        pass
+        result = await self.session.execute(select(UserModel).where(UserModel.id == user.id))
+        user_model = result.scalars().first()
+        if user_model:
+            user_model.company_id = user.company_id
+            user_model.role = user.role
+            await self.session.flush()
+        return user
 
     def _map_to_entity(self, model: UserModel) -> User:
         return User(
@@ -52,6 +59,8 @@ class PostgresUserRepository(UserRepository):
             hashed_password=model.hashed_password,
             first_name=model.first_name,
             last_name=model.last_name,
+            company_id=model.company_id,
+            role=model.role.value if hasattr(model.role, "value") else model.role,
             google_id=model.google_id,
             is_active=model.is_active,
             created_at=model.created_at,

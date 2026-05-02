@@ -26,23 +26,48 @@ class ExperienceLevel(str, enum.Enum):
     LEAD = "lead"
     EXECUTIVE = "executive"
 
+class WorkplaceType(str, enum.Enum):
+    ON_SITE = "on_site"
+    HYBRID = "hybrid"
+    REMOTE = "remote"
+
 class JobModel(Base):
     __tablename__ = "jobs"
 
     id = Column(String, primary_key=True, index=True)
     company_id = Column(String, ForeignKey("companies.id"), nullable=False, index=True)
     created_by = Column(String, ForeignKey("users.id"), nullable=False)
+    
+    # 1. Job title and department
     title = Column(String, nullable=False, index=True)
-    description = Column(Text, nullable=False)
+    job_code = Column(String, nullable=True)
     department = Column(String, nullable=True)
+    
+    # 2. Location
+    workplace_type = Column(Enum(WorkplaceType), default=WorkplaceType.ON_SITE)
     location = Column(String, nullable=True)
-    is_remote = Column(Boolean, default=False)
+    
+    # 3. Description
+    description = Column(Text, nullable=False)
+    requirements = Column(Text, nullable=True)
+    benefits = Column(Text, nullable=True)
+    
+    # 4. Industry & Function
+    company_industry = Column(String, nullable=True)
+    job_function = Column(String, nullable=True)
+    
+    # 5. Employment details
     employment_type = Column(Enum(EmploymentType), nullable=False)
     experience_level = Column(Enum(ExperienceLevel), nullable=False)
-    required_skills = Column(JSON, nullable=True)       # list of skill strings
+    education = Column(String, nullable=True)
+    keywords = Column(JSON, nullable=True) # Replaces required_skills to match UI
+    
+    # 6. Annual salary
     salary_min = Column(Integer, nullable=True)
     salary_max = Column(Integer, nullable=True)
-    salary_currency = Column(String, default="USD")
+    salary_currency = Column(String, default="INR")
+    
+    # System fields
     status = Column(Enum(JobStatus), default=JobStatus.DRAFT)
     published_at = Column(DateTime(timezone=True), nullable=True)
     closed_at = Column(DateTime(timezone=True), nullable=True)

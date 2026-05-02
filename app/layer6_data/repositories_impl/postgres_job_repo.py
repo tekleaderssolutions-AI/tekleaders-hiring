@@ -1,0 +1,111 @@
+from typing import Optional, List
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.layer5_domain.entities.job import Job
+from app.layer5_domain.repositories.job_repository import JobRepository
+from app.layer6_data.models.job_model import JobModel
+
+class PostgresJobRepository(JobRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    def _to_entity(self, model: JobModel) -> Job:
+        return Job(
+            id=model.id,
+            title=model.title,
+            description=model.description,
+            employment_type=model.employment_type.value,
+            experience_level=model.experience_level.value,
+            company_id=model.company_id,
+            created_by=model.created_by,
+            job_code=model.job_code,
+            department=model.department,
+            workplace_type=model.workplace_type.value,
+            location=model.location,
+            requirements=model.requirements,
+            benefits=model.benefits,
+            company_industry=model.company_industry,
+            job_function=model.job_function,
+            education=model.education,
+            keywords=model.keywords,
+            salary_min=model.salary_min,
+            salary_max=model.salary_max,
+            salary_currency=model.salary_currency,
+            status=model.status.value,
+            published_at=model.published_at,
+            closed_at=model.closed_at,
+            created_at=model.created_at,
+            updated_at=model.updated_at
+        )
+
+    def _to_model(self, entity: Job) -> JobModel:
+        return JobModel(
+            id=entity.id,
+            title=entity.title,
+            description=entity.description,
+            employment_type=entity.employment_type,
+            experience_level=entity.experience_level,
+            company_id=entity.company_id,
+            created_by=entity.created_by,
+            job_code=entity.job_code,
+            department=entity.department,
+            workplace_type=entity.workplace_type,
+            location=entity.location,
+            requirements=entity.requirements,
+            benefits=entity.benefits,
+            company_industry=entity.company_industry,
+            job_function=entity.job_function,
+            education=entity.education,
+            keywords=entity.keywords,
+            salary_min=entity.salary_min,
+            salary_max=entity.salary_max,
+            salary_currency=entity.salary_currency,
+            status=entity.status
+        )
+
+    async def create(self, job: Job) -> Job:
+        db_job = self._to_model(job)
+        self.session.add(db_job)
+        await self.session.commit()
+        await self.session.refresh(db_job)
+        return self._to_entity(db_job)
+
+    async def get_by_id(self, job_id: str) -> Optional[Job]:
+        result = await self.session.execute(select(JobModel).filter(JobModel.id == job_id))
+        model = result.scalar_one_or_none()
+        if model:
+            return self._to_entity(model)
+        return None
+
+    async def list_by_company(self, company_id: str) -> List[Job]:
+        result = await self.session.execute(select(JobModel).filter(JobModel.company_id == company_id))
+        models = result.scalars().all()
+        return [self._to_entity(m) for m in models]
+
+    async def update(self, job: Job) -> Job:
+        db_job = await self.session.execute(select(JobModel).filter(JobModel.id == job.id))
+        db_job = db_job.scalar_one_or_none()
+        if db_job:
+            db_job.title = job.title
+            db_job.description = job.description
+            db_job.employment_type = job.employment_type
+            db_job.experience_level = job.experience_level
+            db_job.job_code = job.job_code
+            db_job.department = job.department
+            db_job.workplace_type = job.workplace_type
+            db_job.location = job.location
+            db_job.requirements = job.requirements
+            db_job.benefits = job.benefits
+            db_job.company_industry = job.company_industry
+            db_job.job_function = job.job_function
+            db_job.education = job.education
+            db_job.keywords = job.keywords
+            db_job.salary_min = job.salary_min
+            db_job.salary_max = job.salary_max
+            db_job.salary_currency = job.salary_currency
+            db_job.status = job.status
+            
+            await self.session.commit()
+            await self.session.refresh(db_job)
+            return self._to_entity(db_job)
+        raise ValueError("Job not found")

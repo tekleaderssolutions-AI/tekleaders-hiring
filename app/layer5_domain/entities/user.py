@@ -9,6 +9,8 @@ class User:
     hashed_password: Optional[str]
     first_name: str
     last_name: str
+    company_id: Optional[str] = None
+    role: str = "recruiter"
     google_id: Optional[str] = None
     is_active: bool = True
     created_at: datetime = field(default_factory=datetime.utcnow)
