@@ -26,6 +26,7 @@ class JobCreate(BaseModel):
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     salary_currency: Optional[str] = "INR"
+    status: Optional[JobStatus] = JobStatus.DRAFT
 
 class JobUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=80)

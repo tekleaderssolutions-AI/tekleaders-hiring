@@ -26,6 +26,7 @@ class CreateJobUseCase:
             keywords=payload.keywords,
             salary_min=payload.salary_min,
             salary_max=payload.salary_max,
-            salary_currency=payload.salary_currency
+            salary_currency=payload.salary_currency,
+            status=payload.status.value if payload.status else "draft"
         )
         return await self.job_repo.create(new_job)

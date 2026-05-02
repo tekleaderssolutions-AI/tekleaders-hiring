@@ -48,3 +48,19 @@ async def create_job(
         return job
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.get(
+    "/next-code",
+    summary="Get the next sequential Job Code (TEK-XXX) for the company"
+)
+async def get_next_job_code(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if not current_user.company_id:
+        return {"next_code": "TEK-001"}
+    
+    job_repo = PostgresJobRepository(db)
+    next_code = await job_repo.get_next_job_code(current_user.company_id)
+    return {"next_code": next_code}
+

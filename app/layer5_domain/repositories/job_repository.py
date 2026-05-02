@@ -18,3 +18,7 @@ class JobRepository(ABC):
     @abstractmethod
     async def update(self, job: Job) -> Job:
         pass
+
+    @abstractmethod
+    async def get_next_job_code(self, company_id: str) -> str:
+        pass
