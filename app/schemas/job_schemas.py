@@ -21,7 +21,7 @@ class JobCreate(BaseModel):
     employment_type: EmploymentType
     experience_level: ExperienceLevel
     education_level: Optional[EducationLevel] = None
-    keywords: Optional[List[str]] = []
+    keywords: Optional[List[str] | str] = []
     
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None

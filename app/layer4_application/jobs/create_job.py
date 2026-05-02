@@ -10,6 +10,11 @@ class CreateJobUseCase:
         def get_val(v):
             return v.value if hasattr(v, "value") else v
 
+        # Handle keywords (convert string to list if necessary)
+        keywords_list = payload.keywords
+        if isinstance(keywords_list, str):
+            keywords_list = [k.strip() for k in keywords_list.split(",") if k.strip()]
+
         new_job = Job(
             title=payload.title,
             description=payload.description,
@@ -26,7 +31,7 @@ class CreateJobUseCase:
             industry=get_val(payload.industry) if payload.industry else None,
             job_function=get_val(payload.job_function) if payload.job_function else None,
             education_level=get_val(payload.education_level) if payload.education_level else None,
-            keywords=payload.keywords,
+            keywords=keywords_list,
             salary_min=payload.salary_min,
             salary_max=payload.salary_max,
             salary_currency=payload.salary_currency,
