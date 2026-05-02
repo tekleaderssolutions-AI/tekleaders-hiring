@@ -85,13 +85,13 @@ class JobModel(Base):
     benefits = Column(Text, nullable=True)
     
     # 4. Industry & Function
-    company_industry = Column(Enum(CompanyIndustry), nullable=True)
+    industry = Column(Enum(CompanyIndustry), nullable=True)
     job_function = Column(Enum(JobFunction), nullable=True)
     
     # 5. Employment details
     employment_type = Column(Enum(EmploymentType), nullable=False)
     experience_level = Column(Enum(ExperienceLevel), nullable=False)
-    education = Column(Enum(EducationLevel), nullable=True)
+    education_level = Column(Enum(EducationLevel), nullable=True)
     keywords = Column(JSON, nullable=True) # Replaces required_skills to match UI
     
     # 6. Annual salary

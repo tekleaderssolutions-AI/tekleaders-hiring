@@ -22,10 +22,10 @@ class Job:
     requirements: Optional[str] = None
     benefits: Optional[str] = None
     
-    company_industry: Optional[str] = None
+    industry: Optional[str] = None
     job_function: Optional[str] = None
     
-    education: Optional[str] = None
+    education_level: Optional[str] = None
     keywords: Optional[List[str]] = field(default_factory=list)
     
     salary_min: Optional[int] = None

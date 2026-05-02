@@ -24,9 +24,9 @@ class PostgresJobRepository(JobRepository):
             location=model.location,
             requirements=model.requirements,
             benefits=model.benefits,
-            company_industry=model.company_industry.value if model.company_industry else None,
+            industry=model.industry.value if model.industry else None,
             job_function=model.job_function.value if model.job_function else None,
-            education=model.education.value if model.education else None,
+            education_level=model.education_level.value if model.education_level else None,
             keywords=model.keywords,
             salary_min=model.salary_min,
             salary_max=model.salary_max,
@@ -53,9 +53,9 @@ class PostgresJobRepository(JobRepository):
             location=entity.location,
             requirements=entity.requirements,
             benefits=entity.benefits,
-            company_industry=entity.company_industry,
+            industry=entity.industry,
             job_function=entity.job_function,
-            education=entity.education,
+            education_level=entity.education_level,
             keywords=entity.keywords,
             salary_min=entity.salary_min,
             salary_max=entity.salary_max,
@@ -99,9 +99,9 @@ class PostgresJobRepository(JobRepository):
             db_job.location = job.location
             db_job.requirements = job.requirements
             db_job.benefits = job.benefits
-            db_job.company_industry = job.company_industry
+            db_job.industry = job.industry
             db_job.job_function = job.job_function
-            db_job.education = job.education
+            db_job.education_level = job.education_level
             db_job.keywords = job.keywords
             db_job.salary_min = job.salary_min
             db_job.salary_max = job.salary_max
