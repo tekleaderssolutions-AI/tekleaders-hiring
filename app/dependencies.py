@@ -11,7 +11,7 @@ from app.layer2_adapters.auth.google_auth_adapter import GoogleAuthAdapter
 from app.layer5_domain.entities.user import User
 
 # ─── Database Engine ──────────────────────────────────────────────────────────
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
+engine = create_async_engine(settings.async_database_url, echo=settings.DEBUG)
 
 AsyncSessionLocal = sessionmaker(
     bind=engine,
