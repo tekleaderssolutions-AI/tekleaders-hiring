@@ -68,15 +68,14 @@ class ParseResumeUseCase:
             
             email = extracted_data.get("email")
             
-            # Upsert Logic: Check if candidate already exists
+            # Check if candidate already exists
             existing_candidate = await self.repo.get_by_email(email) if email else None
             
             if existing_candidate:
-                candidate_id = existing_candidate.id
-                memory_id = existing_candidate.memory_id or str(uuid.uuid4())
-            else:
-                candidate_id = str(uuid.uuid4())
-                memory_id = str(uuid.uuid4())
+                return {"error": f"Candidate with email {email} already exists.", "filename": filename}
+            
+            candidate_id = str(uuid.uuid4())
+            memory_id = str(uuid.uuid4())
             
             candidate = Candidate(
                 id=candidate_id,
