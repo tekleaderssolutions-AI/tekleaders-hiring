@@ -19,6 +19,19 @@ class ParseResumeUseCase:
         self.embedder = EmbeddingService()
         self.repo = PostgresCandidateRepository(db_session)
 
+    def build_resume_embedding_text(self, parsed: dict) -> str:
+        """
+        {title} | {location} | skills: {skills_csv} | experience: {yrs} | summary: {one-line summary}
+        """
+        title = parsed.get("current_title") or ""
+        location = parsed.get("location") or ""
+        skills = parsed.get("skills") or []
+        skills_csv = ", ".join(skills)
+        exp_years = parsed.get("total_experience_years") or 0
+
+        summary = f"{title} with {exp_years} years experience in {skills_csv}".strip()
+        return f"{title} | {location} | skills: {skills_csv} | experience: {exp_years} | summary: {summary}"
+
     async def execute_single(self, file_content: bytes, filename: str, user_id: str) -> dict:
         """
         Processes a single resume file
@@ -45,28 +58,30 @@ class ParseResumeUseCase:
             extracted_data = await self.analyzer.analyze(raw_text)
 
             # 3. Embedding
-            skills_list = extracted_data.get("skills") or []
-            summary_text = extracted_data.get("summary") or ""
-            
-            embedding_text = f"{extracted_data.get('first_name')} {extracted_data.get('last_name')} | skills: {', '.join(skills_list)} | summary: {summary_text}"
+            embedding_text = self.build_resume_embedding_text(extracted_data)
             embedding_vector = await self.embedder.generate_embedding(embedding_text)
 
             # 4. Create Candidate Entity
             candidate_id = str(uuid.uuid4())
             memory_id = str(uuid.uuid4())
             
+            # Handle name splitting
+            full_name = extracted_data.get("candidate_name", "Unknown Candidate").split(" ", 1)
+            first_name = full_name[0]
+            last_name = full_name[1] if len(full_name) > 1 else ""
+            
             candidate = Candidate(
                 id=candidate_id,
                 email=extracted_data.get("email"),
-                first_name=extracted_data.get("first_name"),
-                last_name=extracted_data.get("last_name"),
+                first_name=first_name,
+                last_name=last_name,
                 phone=extracted_data.get("phone"),
                 location=extracted_data.get("location"),
-                summary=summary_text,
-                skills=skills_list,
-                total_years_experience=extracted_data.get("total_years_experience", 0.0) or 0.0,
+                summary=extracted_data.get("summary") or "",
+                skills=extracted_data.get("skills") or [],
+                total_years_experience=extracted_data.get("total_experience_years", 0.0) or 0.0,
                 memory_id=memory_id,
-                experience=[CandidateExperience(**exp) for exp in (extracted_data.get("experience") or [])],
+                experience=[CandidateExperience(**exp) for exp in (extracted_data.get("work_experience") or [])],
                 education=[CandidateEducation(**edu) for edu in (extracted_data.get("education") or [])]
             )
 
@@ -74,18 +89,30 @@ class ParseResumeUseCase:
             await self.repo.save(candidate)
 
             # 6. Store in Vector DB (Memories table)
+            resume_metadata = {
+                "candidate_id": candidate_id,
+                "current_company": extracted_data.get("current_company"),
+                "location": extracted_data.get("location"),
+                "total_experience_yrs": extracted_data.get("total_experience_years"),
+                "skills": extracted_data.get("skills") or [],
+                "domain": extracted_data.get("domain"),
+                "education": extracted_data.get("education"),
+                "certifications": extracted_data.get("certifications"),
+                "projects": extracted_data.get("projects"),
+                "file_name": filename,
+                "raw_text_snippet": raw_text[:800],
+                "created_by": user_id
+            }
+
             memory = MemoryModel(
                 id=memory_id,
                 type="resume",
-                title=f"{candidate.first_name} {candidate.last_name}",
+                title=extracted_data.get("current_title") or candidate.first_name,
                 text=embedding_text,
                 embedding=embedding_vector,
-                metadata={
-                    "candidate_id": candidate_id,
-                    "email": candidate.email,
-                    "skills": candidate.skills,
-                    "created_by": user_id
-                }
+                metadata_=resume_metadata,
+                canonical_json=extracted_data,
+                user_id=user_id
             )
             self.db.add(memory)
             await self.db.commit()
@@ -93,7 +120,7 @@ class ParseResumeUseCase:
             return {
                 "status": "success",
                 "candidate_id": candidate_id,
-                "name": f"{candidate.first_name} {candidate.last_name}",
+                "name": extracted_data.get("candidate_name"),
                 "email": candidate.email
             }
 

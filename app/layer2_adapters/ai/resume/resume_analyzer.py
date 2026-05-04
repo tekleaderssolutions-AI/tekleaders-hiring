@@ -14,45 +14,42 @@ class ResumeAnalyzerAgent:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "first_name": {"type": "string"},
-                    "last_name": {"type": "string"},
-                    "email": {"type": "string"},
-                    "phone": {"type": "string"},
-                    "location": {"type": "string"},
-                    "summary": {"type": "string", "description": "A brief 2-3 sentence professional summary"},
-                    "total_years_experience": {"type": "number"},
-                    "skills": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "experience": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "company": {"type": "string"},
-                                "role": {"type": "string"},
-                                "start_date": {"type": "string"},
-                                "end_date": {"type": "string"},
-                                "description": {"type": "string"},
-                                "is_current": {"type": "boolean"}
-                            }
-                        }
-                    },
+                    "candidate_name": {"type": "string", "description": "Full name of the candidate"},
+                    "email": {"type": "string", "description": "Email address"},
+                    "phone": {"type": "string", "description": "Phone number"},
+                    "current_title": {"type": "string", "description": "Current or most recent job title"},
+                    "location": {"type": "string", "description": "Current location (city, state, country)"},
+                    "total_experience_years": {"type": "number", "description": "Total years of professional experience"},
+                    "skills": {"type": "array", "items": {"type": "string"}, "description": "List of technical skills"},
                     "education": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "institution": {"type": "string"},
                                 "degree": {"type": "string"},
-                                "field_of_study": {"type": "string"},
-                                "end_date": {"type": "string"}
+                                "institution": {"type": "string"},
+                                "year": {"type": "string"}
                             }
-                        }
-                    }
+                        },
+                        "description": "Educational background"
+                    },
+                    "work_experience": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "company": {"type": "string"},
+                                "duration": {"type": "string"},
+                                "responsibilities": {"type": "array", "items": {"type": "string"}}
+                            }
+                        },
+                        "description": "Work experience history"
+                    },
+                    "certifications": {"type": "array", "items": {"type": "string"}, "description": "Professional certifications"},
+                    "summary": {"type": "string", "description": "Professional summary or objective"}
                 },
-                "required": ["first_name", "last_name", "email", "skills"]
+                "required": ["candidate_name"]
             }
         }
 

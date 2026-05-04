@@ -4,21 +4,16 @@ from typing import List, Optional, Dict, Any
 
 @dataclass
 class CandidateExperience:
+    title: Optional[str] = None
     company: Optional[str] = None
-    role: Optional[str] = None
-    location: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    description: Optional[str] = None
-    is_current: bool = False
+    duration: Optional[str] = None
+    responsibilities: List[str] = field(default_factory=list)
 
 @dataclass
 class CandidateEducation:
-    institution: Optional[str] = None
     degree: Optional[str] = None
-    field_of_study: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    institution: Optional[str] = None
+    year: Optional[str] = None
 
 @dataclass
 class Candidate:
