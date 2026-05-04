@@ -67,7 +67,7 @@ class JobModel(Base):
     __tablename__ = "jobs"
 
     id = Column(String, primary_key=True, index=True)
-    company_id = Column(String, ForeignKey("companies.id"), nullable=False, index=True)
+    company_id = Column(String, ForeignKey("companies.id"), nullable=True, index=True)
     created_by = Column(String, ForeignKey("users.id"), nullable=False)
     
     # 1. Job title and department

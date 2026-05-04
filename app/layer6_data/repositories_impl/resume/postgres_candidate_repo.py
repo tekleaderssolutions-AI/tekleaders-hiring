@@ -45,7 +45,7 @@ class PostgresCandidateRepository(CandidateRepository):
             candidate_metadata=candidate.metadata
         )
         await self.session.merge(model)
-        await self.session.commit()
+        await self.session.flush()
         return candidate
 
     async def get_by_id(self, candidate_id: str) -> Optional[Candidate]:
@@ -67,6 +67,6 @@ class PostgresCandidateRepository(CandidateRepository):
         model = await self.session.get(CandidateModel, candidate_id)
         if model:
             await self.session.delete(model)
-            await self.session.commit()
+            await self.session.flush()
             return True
         return False

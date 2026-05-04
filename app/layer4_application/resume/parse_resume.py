@@ -122,7 +122,7 @@ class ParseResumeUseCase:
                 user_id=user_id
             )
             self.db.add(memory)
-            await self.db.commit()
+            await self.db.flush()
 
             return {
                 "status": "success",
