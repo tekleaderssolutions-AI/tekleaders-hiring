@@ -22,7 +22,9 @@ class EmbeddingService:
         """
         title = jd_data.get("role", "N/A")
         location = jd_data.get("location", "N/A")
-        skills = ", ".join(jd_data.get("primary_skills", []))
+        primary_skills = jd_data.get("primary_skills", [])
+        skills_list = [s.get("name") if isinstance(s, dict) else str(s) for s in primary_skills]
+        skills = ", ".join(skills_list)
         
         exp = jd_data.get("experience", {}) or {}
         exp_str = f"{exp.get('min', '0')}-{exp.get('max', 'any')}"
