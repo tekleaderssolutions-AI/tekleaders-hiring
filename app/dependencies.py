@@ -1,23 +1,14 @@
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from typing import AsyncGenerator
 
 from app.config import settings
+from app.database import AsyncSessionLocal, engine
 from app.layer6_data.repositories_impl.postgres_user_repo import PostgresUserRepository
 from app.layer2_adapters.auth.google_auth_adapter import GoogleAuthAdapter
 from app.layer5_domain.entities.user import User
-
-# ─── Database Engine ──────────────────────────────────────────────────────────
-engine = create_async_engine(settings.async_database_url, echo=settings.DEBUG)
-
-AsyncSessionLocal = sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:

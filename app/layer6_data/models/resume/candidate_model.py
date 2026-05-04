@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, JSON, Float, Boolean, func
-from app.dependencies import AsyncSessionLocal
+
 from app.layer6_data.models.base import Base
 
 class CandidateModel(Base):
