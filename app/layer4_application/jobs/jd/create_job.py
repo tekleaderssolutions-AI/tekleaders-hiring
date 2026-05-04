@@ -1,6 +1,6 @@
-from app.layer5_domain.entities.job import Job
-from app.layer5_domain.repositories.job_repository import JobRepository
-from app.schemas.job_schemas import JobCreate
+from app.layer5_domain.entities.jd.job import Job
+from app.layer5_domain.repositories.jd.job_repository import JobRepository
+from app.schemas.jd.job_schemas import JobCreate
 
 class CreateJobUseCase:
     def __init__(self, job_repo: JobRepository):

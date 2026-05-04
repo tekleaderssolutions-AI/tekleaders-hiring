@@ -1,9 +1,9 @@
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.layer5_domain.entities.job import Job
-from app.layer5_domain.repositories.job_repository import JobRepository
-from app.layer6_data.models.job_model import JobModel
+from app.layer5_domain.entities.jd.job import Job
+from app.layer5_domain.repositories.jd.job_repository import JobRepository
+from app.layer6_data.models.jd.job_model import JobModel
 
 class PostgresJobRepository(JobRepository):
     def __init__(self, session: AsyncSession):

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.api.v1.auth import router as auth_router
-from app.api.v1.jobs import router as jobs_router
+from app.api.v1.jd.jobs import router as jobs_router
 
 def create_app() -> FastAPI:
     app = FastAPI(

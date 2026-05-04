@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from app.layer6_data.models.job_model import EmploymentType, ExperienceLevel, WorkplaceType, JobStatus, CompanyIndustry, JobFunction, EducationLevel
+from app.layer6_data.models.jd.job_model import EmploymentType, ExperienceLevel, WorkplaceType, JobStatus, CompanyIndustry, JobFunction, EducationLevel
 
 class JobCreate(BaseModel):
     title: str = Field(..., max_length=80)

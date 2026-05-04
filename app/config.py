@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
 
+    # OpenAI / LLM
+    OPENAI_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-4o-mini"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+
     # CORS
     ALLOWED_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
 

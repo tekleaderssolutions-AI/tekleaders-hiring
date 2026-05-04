@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
+import os
+import shutil
+from typing import List
 
-from app.schemas.job_schemas import JobCreate, JobRead
-from app.layer4_application.jobs.create_job import CreateJobUseCase
-from app.layer6_data.repositories_impl.postgres_job_repo import PostgresJobRepository
+from app.schemas.jd.job_schemas import JobCreate, JobRead
+from app.layer4_application.jobs.jd.create_job import CreateJobUseCase
+from app.layer4_application.jobs.jd.analyze_jd import AnalyzeJDUseCase
+from app.layer6_data.repositories_impl.jd.postgres_job_repo import PostgresJobRepository
 from app.layer6_data.repositories_impl.postgres_user_repo import PostgresUserRepository
 from app.layer6_data.models.company_model import CompanyModel
 from app.dependencies import get_db, get_current_user
@@ -13,10 +17,42 @@ from app.layer5_domain.entities.user import User
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 @router.post(
+    "/analyze",
+    status_code=status.HTTP_200_OK,
+    summary="Upload and analyze a JD (PDF/DOCX) using AI"
+)
+async def analyze_jd(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Create temp directory if it doesn't exist
+    temp_dir = "temp_uploads"
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file.filename}")
+    
+    try:
+        # Save file locally for processing
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        use_case = AnalyzeJDUseCase(db)
+        result = await use_case.execute(file_path, user_id=current_user.id)
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    finally:
+        # Cleanup
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+@router.post(
     "",
     response_model=JobRead,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new job posting"
+    summary="Create a new job posting manually"
 )
 async def create_job(
     payload: JobCreate,

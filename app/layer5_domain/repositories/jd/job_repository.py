@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
-from app.layer5_domain.entities.job import Job
+from app.layer5_domain.entities.jd.job import Job
 
 class JobRepository(ABC):
     @abstractmethod
