@@ -44,7 +44,10 @@ class ParseResumeUseCase:
             extracted_data = await self.analyzer.analyze(raw_text)
 
             # 3. Embedding
-            embedding_text = f"{extracted_data.get('first_name')} {extracted_data.get('last_name')} | skills: {', '.join(extracted_data.get('skills', []))} | summary: {extracted_data.get('summary')}"
+            skills_list = extracted_data.get("skills") or []
+            summary_text = extracted_data.get("summary") or ""
+            
+            embedding_text = f"{extracted_data.get('first_name')} {extracted_data.get('last_name')} | skills: {', '.join(skills_list)} | summary: {summary_text}"
             embedding_vector = await self.embedder.generate_embedding(embedding_text)
 
             # 4. Create Candidate Entity
@@ -58,12 +61,12 @@ class ParseResumeUseCase:
                 last_name=extracted_data.get("last_name"),
                 phone=extracted_data.get("phone"),
                 location=extracted_data.get("location"),
-                summary=extracted_data.get("summary"),
-                skills=extracted_data.get("skills", []),
-                total_years_experience=extracted_data.get("total_years_experience", 0.0),
+                summary=summary_text,
+                skills=skills_list,
+                total_years_experience=extracted_data.get("total_years_experience", 0.0) or 0.0,
                 memory_id=memory_id,
-                experience=[CandidateExperience(**exp) for exp in extracted_data.get("experience", [])],
-                education=[CandidateEducation(**edu) for edu in extracted_data.get("education", [])]
+                experience=[CandidateExperience(**exp) for exp in (extracted_data.get("experience") or [])],
+                education=[CandidateEducation(**edu) for edu in (extracted_data.get("education") or [])]
             )
 
             # 5. Store in Postgres
