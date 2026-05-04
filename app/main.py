@@ -4,8 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.jd.jobs import router as jobs_router
+from app.api.v1.resume.candidates import router as candidates_router
 
 def create_app() -> FastAPI:
+    # ... (existing setup)
     app = FastAPI(
         title=settings.APP_NAME,
         description="AI-Driven Recruitment Platform — Hexagonal + DDD + Event-Driven",
@@ -26,6 +28,7 @@ def create_app() -> FastAPI:
     # ─── Routers ──────────────────────────────────────────────────────────────
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(jobs_router, prefix="/api/v1")
+    app.include_router(candidates_router, prefix="/api/v1")
 
     @app.get("/health", tags=["Health"])
     async def health_check():

@@ -7,7 +7,7 @@ from app.layer6_data.models.base import Base  # noqa: F401
 from app.layer6_data.models.company_model import CompanyModel       # noqa: F401
 from app.layer6_data.models.user_model import UserModel             # noqa: F401
 from app.layer6_data.models.jd.job_model import JobModel               # noqa: F401
-from app.layer6_data.models.candidate_model import CandidateModel   # noqa: F401
+from app.layer6_data.models.resume.candidate_model import CandidateModel   # noqa: F401
 from app.layer6_data.models.application_model import ApplicationModel  # noqa: F401
 from app.layer6_data.models.interview_model import InterviewModel   # noqa: F401
 from app.layer6_data.models.employee_model import EmployeeModel     # noqa: F401

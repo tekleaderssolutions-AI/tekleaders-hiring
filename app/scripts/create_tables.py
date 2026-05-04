@@ -20,7 +20,7 @@ async def create_all_tables():
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
-    print("✅ All tables created successfully.")
+    print("OK: All tables created successfully.")
 
 if __name__ == "__main__":
     asyncio.run(create_all_tables())

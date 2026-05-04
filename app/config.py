@@ -47,6 +47,6 @@ settings = Settings()
 
 # Safety Check (Redacted print)
 if settings.OPENAI_API_KEY:
-    print(f"✅ OpenAI Key detected (Starts with: {settings.OPENAI_API_KEY[:7]}...)")
+    print(f"OK: OpenAI Key detected (Starts with: {settings.OPENAI_API_KEY[:7]}...)")
 else:
-    print("❌ CRITICAL: OpenAI API Key NOT FOUND in environment or .env file!")
+    print("ERROR: CRITICAL: OpenAI API Key NOT FOUND in environment or .env file!")
