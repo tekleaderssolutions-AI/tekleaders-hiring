@@ -13,8 +13,10 @@ class MemoryModel(Base):
     embedding = Column(Vector(1536), nullable=True)    # OpenAI embedding size
     metadata_ = Column("metadata", JSON, nullable=True)
     canonical_json = Column(JSON, nullable=True)       # Full structured output
+    short_id = Column(String, nullable=True, index=True) # e.g. tek0001
+    user_id = Column(String, nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Note: IVFFlat index creation usually happens in migrations or raw SQL
     # as it requires specific parameters like 'lists'

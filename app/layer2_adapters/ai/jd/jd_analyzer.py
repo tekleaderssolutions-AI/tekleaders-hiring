@@ -16,7 +16,6 @@ class JDAnalyzerAgent:
                 "type": "object",
                 "properties": {
                     "role": {"type": ["string", "null"]},
-                    "summary": {"type": ["string", "null"], "description": "A 150-800 character human-readable summary of the job."},
                     "team": {"type": ["string", "null"]},
                     "location": {"type": ["string", "null"]},
                     "employment_type": {"type": ["string", "null"]},
@@ -25,36 +24,25 @@ class JDAnalyzerAgent:
                         "properties": {
                             "min": {"type": ["integer", "null"]},
                             "max": {"type": ["integer", "null"]},
-                            "units": {"type": ["string", "null"]}
-                        }
+                            "units": {"type": ["string", "null"]},
+                        },
                     },
                     "salary": {
                         "type": ["object", "null"],
                         "properties": {
                             "min": {"type": ["number", "null"]},
                             "max": {"type": ["number", "null"]},
-                            "currency": {"type": ["string", "null"]}
-                        }
+                            "currency": {"type": ["string", "null"]},
+                        },
                     },
-                    "primary_skills": {
-                        "type": "array", 
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "importance": {"type": "string", "enum": ["must-have", "preferred"]}
-                            }
-                        }
-                    },
+                    "primary_skills": {"type": "array", "items": {"type": "string"}},
                     "secondary_skills": {"type": "array", "items": {"type": "string"}},
                     "responsibilities": {"type": "array", "items": {"type": "string"}},
                     "education": {"type": "array", "items": {"type": "string"}},
                     "nice_to_have": {"type": "array", "items": {"type": "string"}},
-                    "domain": {"type": ["string", "null"], "description": "e.g. Fintech, Healthcare, E-commerce"},
-                    "seniority_hints": {"type": "array", "items": {"type": "string"}, "description": "Keywords like Lead, Senior, Architect found in text"},
-                    "keywords": {"type": "array", "items": {"type": "string"}}
-                }
-            }
+                    "keywords": {"type": "array", "items": {"type": "string"}},
+                },
+            },
         }
 
     async def extract_structured_jd(self, text: str) -> dict:
