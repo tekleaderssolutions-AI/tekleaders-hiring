@@ -1,4 +1,5 @@
 import uuid
+from sqlalchemy import select
 from app.layer2_adapters.files.pdf_parser import PDFParser
 from app.layer2_adapters.files.docx_parser import DocxParser
 from app.layer7_crosscutting.jd.text_processor import TextProcessor
@@ -110,18 +111,36 @@ class AnalyzeJDUseCase:
         embedding_text = self.build_embedding_text(extracted_data, summary=summary)
         embedding_vector = await self.embedder.generate_embedding(embedding_text)
 
-        # 14. Sequential ID Generation
+        # 14. Sequential ID Generation (for Memory/Matching)
         short_id = await self.memory_repo.get_next_short_id()
 
-        # 15. Storage
+        # 15. Create High-Level Job Record (for Dashboard)
+        # We need a company_id. If not provided, we'll assume the user has one.
+        from app.layer6_data.repositories_impl.jd.postgres_job_repo import PostgresJobRepository
+        from app.layer5_domain.entities.jd.job import Job
+        job_repo = PostgresJobRepository(self.db)
+        
+        # Determine job_id
+        actual_job_id = job_id or str(uuid.uuid4())
+        
+        # Get next business job_code (e.g. TEK-001)
+        # Note: We need company_id for this. If not passed, we'll need to fetch it from the user.
+        from app.layer6_data.models.user_model import UserModel
+        res = await self.db.execute(select(UserModel).filter(UserModel.id == user_id))
+        user_model = res.scalar_one_or_none()
+        company_id = user_model.company_id if user_model else None
+
+        job_code = await job_repo.get_next_job_code(company_id) if company_id else f"TEK-{short_id[-3:]}"
+
+        # 16. Storage - Memory (AI Matching)
         memory_id = str(uuid.uuid4())
         
-        # Prepare metadata exactly as reference code
         exp = extracted_data.get("experience") or {}
         salary = extracted_data.get("salary") or {}
         
         metadata = {
-            "job_id": job_id,
+            "job_id": actual_job_id,
+            "job_code": job_code,
             "location": extracted_data.get("location"),
             "employment_type": extracted_data.get("employment_type"),
             "experience_min": exp.get("min"),
@@ -152,9 +171,34 @@ class AnalyzeJDUseCase:
         
         await self.memory_repo.save(memory)
 
+        # 17. Storage - Job Posting (Dashboard)
+        from app.layer6_data.models.jd.job_model import JobModel
+        
+        job_model = JobModel(
+            id=actual_job_id,
+            company_id=company_id,
+            created_by=user_id,
+            title=extracted_data.get("role") or "Untitled Role",
+            job_code=job_code,
+            short_id=short_id,
+            location=extracted_data.get("location"),
+            description=redacted_text,
+            employment_type=extracted_data.get("employment_type") or "Full-time",
+            experience_level="Mid Level", # Default or map from experience min
+            primary_skills=extracted_data.get("primary_skills"),
+            salary_min=salary.get("min"),
+            salary_max=salary.get("max"),
+            salary_currency=salary.get("currency") or "INR",
+            status="open"
+        )
+        self.db.add(job_model)
+        await self.db.flush()
+
         return {
-            "memory_id": memory_id,
+            "job_id": actual_job_id,
+            "job_code": job_code,
             "short_id": short_id,
+            "memory_id": memory_id,
             "structured_data": extracted_data,
             "summary": summary,
             "quality_score": quality_score

@@ -73,7 +73,9 @@ class JobModel(Base):
     # 1. Job title and department
     title = Column(String, nullable=False, index=True)
     job_code = Column(String, nullable=True)
+    short_id = Column(String, nullable=True, index=True) # e.g. tek0001
     department = Column(String, nullable=True)
+    team = Column(String, nullable=True)
     
     # 2. Location
     workplace_type = Column(Enum(WorkplaceType), default=WorkplaceType.ON_SITE)
@@ -92,6 +94,7 @@ class JobModel(Base):
     employment_type = Column(Enum(EmploymentType), nullable=False)
     experience_level = Column(Enum(ExperienceLevel), nullable=False)
     education_level = Column(Enum(EducationLevel), nullable=True)
+    primary_skills = Column(JSON, nullable=True) 
     keywords = Column(JSON, nullable=True) # Replaces required_skills to match UI
     
     # 6. Annual salary
