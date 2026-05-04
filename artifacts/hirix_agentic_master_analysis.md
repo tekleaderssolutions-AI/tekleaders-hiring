@@ -151,7 +151,6 @@ Our agents are not just "prompts"; they are **Architectural Adapters** that serv
 ### 3. Orchestration Agent (Layer 4 — Application)
 *   **Role**: The "Manager" that coordinates the 17-stage pipeline.
 *   **Architecture**: It lives in the Application Layer (`ParseResumeUseCase`). It doesn't know *how* to call OpenAI; it only knows *when* to call the specialized agents.
-
 ---
 
 **Final Word-by-Word Audit Complete.**

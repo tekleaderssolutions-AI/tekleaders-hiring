@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, DateTime, JSON, Float, Boolean, func
 
+from sqlalchemy.orm import relationship
 from app.layer6_data.models.base import Base
 
 class CandidateModel(Base):
@@ -24,6 +25,9 @@ class CandidateModel(Base):
     memory_id = Column(String, index=True) # ID in Vector DB
     
     candidate_metadata = Column(JSON, default=dict)
+    
+    # Relationships
+    applications = relationship("ApplicationModel", back_populates="candidate")
     
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
