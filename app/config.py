@@ -1,4 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
+from pathlib import Path
+
+# Absolute path to .env file
+_env_path = os.path.join(Path(__file__).parent.parent, ".env")
 
 class Settings(BaseSettings):
     # App
@@ -32,13 +37,6 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
 
-    from pydantic_settings import SettingsConfigDict
-    import os
-    from pathlib import Path
-    
-    # Absolute path to .env file
-    _env_path = os.path.join(Path(__file__).parent.parent, ".env")
-    
     model_config = SettingsConfigDict(
         env_file=_env_path,
         env_file_encoding='utf-8',
