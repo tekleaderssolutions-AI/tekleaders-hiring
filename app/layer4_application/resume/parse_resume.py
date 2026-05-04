@@ -61,14 +61,22 @@ class ParseResumeUseCase:
             embedding_text = self.build_resume_embedding_text(extracted_data)
             embedding_vector = await self.embedder.generate_embedding(embedding_text)
 
-            # 4. Create Candidate Entity
-            candidate_id = str(uuid.uuid4())
-            memory_id = str(uuid.uuid4())
-            
             # Handle name splitting
             full_name = extracted_data.get("candidate_name", "Unknown Candidate").split(" ", 1)
             first_name = full_name[0]
             last_name = full_name[1] if len(full_name) > 1 else ""
+            
+            email = extracted_data.get("email")
+            
+            # Upsert Logic: Check if candidate already exists
+            existing_candidate = await self.repo.get_by_email(email) if email else None
+            
+            if existing_candidate:
+                candidate_id = existing_candidate.id
+                memory_id = existing_candidate.memory_id or str(uuid.uuid4())
+            else:
+                candidate_id = str(uuid.uuid4())
+                memory_id = str(uuid.uuid4())
             
             candidate = Candidate(
                 id=candidate_id,
