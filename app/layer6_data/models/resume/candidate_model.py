@@ -7,7 +7,7 @@ class CandidateModel(Base):
     __tablename__ = "candidates"
 
     id = Column(String, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)
     first_name = Column(String)
     last_name = Column(String)
     phone = Column(String)

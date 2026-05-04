@@ -70,13 +70,9 @@ class ParseResumeUseCase:
             first_name = full_name[0]
             last_name = full_name[1] if len(full_name) > 1 else ""
             
-            email = extracted_data.get("email")
-            if not email:
-                email = f"unknown_{candidate_id[:8]}@hirix.local"
-
             candidate = Candidate(
                 id=candidate_id,
-                email=email,
+                email=extracted_data.get("email"),
                 first_name=first_name,
                 last_name=last_name,
                 phone=extracted_data.get("phone"),
