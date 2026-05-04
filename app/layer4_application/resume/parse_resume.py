@@ -24,7 +24,8 @@ class ParseResumeUseCase:
         Processes a single resume file
         """
         # Save temp file for parsing
-        temp_path = f"temp_{uuid.uuid4()}_{filename}"
+        safe_filename = os.path.basename(filename)
+        temp_path = f"temp_{uuid.uuid4()}_{safe_filename}"
         with open(temp_path, "wb") as f:
             f.write(file_content)
 
