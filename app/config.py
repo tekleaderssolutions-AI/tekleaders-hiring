@@ -32,8 +32,23 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
 
-    class Config:
-        env_file = ".env"
-        extra = "allow"
+    from pydantic_settings import SettingsConfigDict
+    import os
+    from pathlib import Path
+    
+    # Absolute path to .env file
+    _env_path = os.path.join(Path(__file__).parent.parent, ".env")
+    
+    model_config = SettingsConfigDict(
+        env_file=_env_path,
+        env_file_encoding='utf-8',
+        extra='ignore'
+    )
 
 settings = Settings()
+
+# Safety Check (Redacted print)
+if settings.OPENAI_API_KEY:
+    print(f"✅ OpenAI Key detected (Starts with: {settings.OPENAI_API_KEY[:7]}...)")
+else:
+    print("❌ CRITICAL: OpenAI API Key NOT FOUND in environment or .env file!")
