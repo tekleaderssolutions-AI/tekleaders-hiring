@@ -16,6 +16,17 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
+    # ─── Startup Events ───────────────────────────────────────────────────────
+    @app.on_event("startup")
+    async def on_startup():
+        from app.scripts.sync_schema import sync_schema
+        try:
+            print("Running database schema synchronization...")
+            await sync_schema()
+            print("Database schema synchronization complete.")
+        except Exception as e:
+            print(f"Error during database sync: {e}")
+
     # ─── CORS ─────────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,
