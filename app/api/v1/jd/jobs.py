@@ -99,3 +99,38 @@ async def get_next_job_code(
     next_code = await job_repo.get_next_job_code(current_user.company_id)
     return {"next_code": next_code}
 
+@router.get(
+    "",
+    summary="List all jobs for the current company"
+)
+async def list_jobs(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if not current_user.company_id:
+        return []
+        
+    job_repo = PostgresJobRepository(db)
+    jobs = await job_repo.list_by_company(current_user.company_id)
+    return jobs
+
+@router.get(
+    "/{job_id}",
+    summary="Get job details by ID"
+)
+async def get_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    job_repo = PostgresJobRepository(db)
+    job = await job_repo.get_by_id(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Optional: Verify user has access to this job's company
+    if job.company_id != current_user.company_id:
+         raise HTTPException(status_code=403, detail="Not authorized to view this job")
+         
+    return job
+
