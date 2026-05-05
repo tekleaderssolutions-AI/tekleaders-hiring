@@ -11,6 +11,49 @@ class JobStatus(str, enum.Enum):
     ON_HOLD = "on_hold"
     CANCELLED = "cancelled"
 
+class EmploymentType(str, enum.Enum):
+    FULL_TIME = "full_time"
+    PART_TIME = "part_time"
+    CONTRACT = "contract"
+    INTERN = "intern"
+    FREELANCE = "freelance"
+
+class ExperienceLevel(str, enum.Enum):
+    ENTRY = "entry"
+    JUNIOR = "junior"
+    MID = "mid"
+    SENIOR = "senior"
+    LEAD = "lead"
+    EXECUTIVE = "executive"
+
+class WorkplaceType(str, enum.Enum):
+    ON_SITE = "on_site"
+    REMOTE = "remote"
+    HYBRID = "hybrid"
+
+class CompanyIndustry(str, enum.Enum):
+    TECHNOLOGY = "technology"
+    FINANCE = "finance"
+    HEALTHCARE = "healthcare"
+    EDUCATION = "education"
+    MANUFACTURING = "manufacturing"
+    OTHER = "other"
+
+class JobFunction(str, enum.Enum):
+    ENGINEERING = "engineering"
+    PRODUCT = "product"
+    DESIGN = "design"
+    MARKETING = "marketing"
+    SALES = "sales"
+    OTHER = "other"
+
+class EducationLevel(str, enum.Enum):
+    BACHELORS = "bachelors"
+    MASTERS = "masters"
+    PHD = "phd"
+    DIPLOMA = "diploma"
+    OTHER = "other"
+
 class JobModel(Base):
     """
     GLOBAL JOB IDENTITY

@@ -26,9 +26,10 @@ from app.layer6_data.models.memory_model import MemoryModel         # noqa: F401
 
 __all__ = [
     "Base",
-    "CompanyModel", "UserModel", "JobModel", "CandidateModel", "ResumeModel",
-    "ApplicationModel", "CandidateEvaluationModel", "SearchSessionModel",
-    "AgentRunModel", "AgentStepModel",
+    "CompanyModel", "UserModel", "JobModel", "JobVersionModel", 
+    "CandidateModel", "ResumeModel",
+    "ApplicationModel", "CandidateEvaluationModel", "ApplicationFeedbackModel",
+    "SearchSessionModel", "AgentRunModel", "AgentStepModel",
     "InterviewModel", "EmployeeModel",
     "AIDecisionModel", "AuditLogModel", "NotificationModel", "TokenModel",
     "MemoryModel",
