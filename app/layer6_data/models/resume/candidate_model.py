@@ -1,33 +1,27 @@
-from sqlalchemy import Column, String, DateTime, JSON, Float, Boolean, func
-
+from sqlalchemy import Column, String, DateTime, func
 from sqlalchemy.orm import relationship
 from app.layer6_data.models.base import Base
 
 class CandidateModel(Base):
+    """
+    GLOBAL IDENTITY LAYER
+    Represents a unique person across the entire Hirix platform.
+    One candidate = one identity (email unique).
+    """
     __tablename__ = "candidates"
 
     id = Column(String, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=True)
-    first_name = Column(String)
-    last_name = Column(String)
-    phone = Column(String)
-    location = Column(String)
-    summary = Column(String)
+    email = Column(String, unique=True, index=True, nullable=False)
     
-    # Structured Data (Stored as JSONB in Postgres)
-    skills = Column(JSON, default=list)
-    experience = Column(JSON, default=list)
-    education = Column(JSON, default=list)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    linkedin_url = Column(String, nullable=True)
     
-    total_years_experience = Column(Float, default=0.0)
-    
-    # Matching Reference
-    memory_id = Column(String, index=True) # ID in Vector DB
-    
-    candidate_metadata = Column(JSON, default=dict)
-    
+    # System Fields
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
     # Relationships
+    resumes = relationship("ResumeModel", back_populates="candidate", cascade="all, delete-orphan")
     applications = relationship("ApplicationModel", back_populates="candidate")
-    
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

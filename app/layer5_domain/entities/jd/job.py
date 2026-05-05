@@ -20,6 +20,7 @@ class Job:
     location: Optional[str] = None
     
     requirements: Optional[str] = None
+    requirements_json: Optional[dict] = field(default_factory=dict)
     benefits: Optional[str] = None
     
     industry: Optional[str] = None

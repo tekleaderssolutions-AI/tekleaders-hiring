@@ -1,72 +1,100 @@
 from typing import List, Optional
+import hashlib
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.layer5_domain.entities.resume.candidate import Candidate, CandidateExperience, CandidateEducation
-from app.layer5_domain.repositories.resume.candidate_repository import CandidateRepository
+from sqlalchemy import desc
 from app.layer6_data.models.resume.candidate_model import CandidateModel
+from app.layer6_data.models.resume.resume_model import ResumeModel
 
-class PostgresCandidateRepository(CandidateRepository):
+class PostgresCandidateRepository:
+    """
+    Handles persistence for Candidates (Identity) and Resumes (Versions).
+    """
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    def _to_entity(self, model: CandidateModel) -> Candidate:
-        return Candidate(
-            id=model.id,
-            email=model.email,
-            first_name=model.first_name,
-            last_name=model.last_name,
-            phone=model.phone,
-            location=model.location,
-            summary=model.summary,
-            skills=model.skills or [],
-            experience=[CandidateExperience(**exp) for exp in (model.experience or [])],
-            education=[CandidateEducation(**edu) for edu in (model.education or [])],
-            total_years_experience=model.total_years_experience or 0.0,
-            memory_id=model.memory_id,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
-            metadata=model.candidate_metadata or {}
-        )
-
-    async def save(self, candidate: Candidate) -> Candidate:
-        model = CandidateModel(
-            id=candidate.id,
-            email=candidate.email,
-            first_name=candidate.first_name,
-            last_name=candidate.last_name,
-            phone=candidate.phone,
-            location=candidate.location,
-            summary=candidate.summary,
-            skills=candidate.skills,
-            experience=[vars(exp) for exp in candidate.experience],
-            education=[vars(edu) for edu in candidate.education],
-            total_years_experience=candidate.total_years_experience,
-            memory_id=candidate.memory_id,
-            candidate_metadata=candidate.metadata
-        )
-        await self.session.merge(model)
-        await self.session.flush()
+    async def get_or_create_candidate(self, email: str, first_name: str = None, last_name: str = None, phone: str = None) -> CandidateModel:
+        """
+        Ensures a global identity exists for the given email.
+        """
+        result = await self.session.execute(select(CandidateModel).where(CandidateModel.email == email))
+        candidate = result.scalar_one_or_none()
+        
+        if not candidate:
+            candidate = CandidateModel(
+                id=str(hashlib.md5(email.lower().encode()).hexdigest()[:12]), # Stable ID based on email
+                email=email.lower(),
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone
+            )
+            self.session.add(candidate)
+            await self.session.flush()
+        else:
+            # Update info if provided and missing
+            if first_name: candidate.first_name = first_name
+            if last_name: candidate.last_name = last_name
+            if phone: candidate.phone = phone
+            
         return candidate
 
-    async def get_by_id(self, candidate_id: str) -> Optional[Candidate]:
-        result = await self.session.execute(select(CandidateModel).where(CandidateModel.id == candidate_id))
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+    async def get_resume_by_hash(self, content_hash: str) -> Optional[ResumeModel]:
+        """
+        Used for deduplication (Step 1b).
+        """
+        result = await self.session.execute(select(ResumeModel).where(ResumeModel.content_hash == content_hash))
+        return result.scalar_one_or_none()
 
-    async def get_by_email(self, email: str) -> Optional[Candidate]:
-        result = await self.session.execute(select(CandidateModel).where(CandidateModel.email == email))
-        model = result.scalar_one_or_none()
-        return self._to_entity(model) if model else None
+    async def save_resume(self, resume_data: dict, archive_others: bool = True) -> ResumeModel:
+        """
+        Saves a new versioned resume for a candidate.
+        """
+        candidate_id = resume_data["candidate_id"]
+        
+        # ── PRIORITY 2: Lifecycle Management ────────────────────────────────
+        if archive_others:
+            from sqlalchemy import update
+            from app.layer6_data.models.memory_model import MemoryModel
+            
+            # 1. Archive old resumes
+            await self.session.execute(
+                update(ResumeModel)
+                .where(ResumeModel.candidate_id == candidate_id)
+                .values(is_active=False)
+            )
+            # 2. Archive associated memories
+            # This ensures only the latest resume's chunks are active in the matching engine
+            resume_ids_query = select(ResumeModel.id).where(ResumeModel.candidate_id == candidate_id)
+            await self.session.execute(
+                update(MemoryModel)
+                .where(MemoryModel.resume_id.in_(resume_ids_query))
+                .values(is_active=False)
+            )
 
-    async def list_candidates(self, limit: int = 100, offset: int = 0) -> List[Candidate]:
+        # Get latest version number
+        result = await self.session.execute(
+            select(ResumeModel.version)
+            .where(ResumeModel.candidate_id == candidate_id)
+            .order_by(desc(ResumeModel.version))
+            .limit(1)
+        )
+        latest_version = result.scalar_one_or_none() or 0
+        
+        resume = ResumeModel(
+            **resume_data,
+            version=latest_version + 1,
+            is_active=True
+        )
+        self.session.add(resume)
+        await self.session.flush()
+        return resume
+
+    async def get_candidate_with_resumes(self, candidate_id: str) -> Optional[CandidateModel]:
+        result = await self.session.execute(
+            select(CandidateModel).where(CandidateModel.id == candidate_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_candidates(self, limit: int = 100, offset: int = 0) -> List[CandidateModel]:
         result = await self.session.execute(select(CandidateModel).limit(limit).offset(offset))
-        models = result.scalars().all()
-        return [self._to_entity(m) for m in models]
-
-    async def delete(self, candidate_id: str) -> bool:
-        model = await self.session.get(CandidateModel, candidate_id)
-        if model:
-            await self.session.delete(model)
-            await self.session.flush()
-            return True
-        return False
+        return result.scalars().all()

@@ -1,6 +1,7 @@
 import json
 from openai import OpenAI
 from app.config import settings
+from app.layer7_crosscutting.ai.resilience import ai_retry
 
 class ResumeAnalyzerAgent:
     def __init__(self):
@@ -14,25 +15,13 @@ class ResumeAnalyzerAgent:
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "candidate_name": {"type": "string", "description": "Full name of the candidate"},
-                    "email": {"type": "string", "description": "Email address"},
-                    "phone": {"type": "string", "description": "Phone number"},
-                    "current_title": {"type": "string", "description": "Current or most recent job title"},
-                    "location": {"type": "string", "description": "Current location (city, state, country)"},
-                    "total_experience_years": {"type": "number", "description": "Total years of professional experience"},
-                    "skills": {"type": "array", "items": {"type": "string"}, "description": "List of technical skills"},
-                    "education": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "degree": {"type": "string"},
-                                "institution": {"type": "string"},
-                                "year": {"type": "string"}
-                            }
-                        },
-                        "description": "Educational background"
-                    },
+                    "candidate_name": {"type": "string"},
+                    "email": {"type": "string"},
+                    "phone": {"type": "string"},
+                    "current_title": {"type": "string"},
+                    "location": {"type": "string"},
+                    "total_experience_years": {"type": "number"},
+                    "skills": {"type": "array", "items": {"type": "string"}},
                     "work_experience": {
                         "type": "array",
                         "items": {
@@ -43,25 +32,20 @@ class ResumeAnalyzerAgent:
                                 "duration": {"type": "string"},
                                 "responsibilities": {"type": "array", "items": {"type": "string"}}
                             }
-                        },
-                        "description": "Work experience history"
+                        }
                     },
-                    "certifications": {"type": "array", "items": {"type": "string"}, "description": "Professional certifications"},
-                    "summary": {"type": "string", "description": "Professional summary or objective"}
+                    "summary": {"type": "string"}
                 },
                 "required": ["candidate_name"]
             }
         }
 
+    @ai_retry(max_retries=3)
     async def analyze(self, text: str) -> dict:
-        """
-        Uses OpenAI to extract structured candidate data from raw resume text
-        """
         messages = [
-            {"role": "system", "content": "You are an expert recruitment assistant. Extract highly accurate structured data from the provided resume text. If a field is missing, return null."},
-            {"role": "user", "content": f"Extract candidate info from this resume:\n\n{text}"}
+            {"role": "system", "content": "You are an expert recruitment assistant. Extract highly accurate structured data."},
+            {"role": "user", "content": f"Extract candidate info:\n\n{text}"}
         ]
-
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -69,6 +53,30 @@ class ResumeAnalyzerAgent:
             function_call={"name": "extract_resume"},
             temperature=0.0
         )
+        return json.loads(response.choices[0].message.function_call.arguments)
 
-        function_args = response.choices[0].message.function_call.arguments
-        return json.loads(function_args)
+    @ai_retry(max_retries=3)
+    async def evaluate_match(self, jd_text: str, resume_text: str) -> dict:
+        """
+        ELITE RERANKER: Performs a deep-dive comparison between JD and Resume.
+        Looks for depth of experience, leadership, and cultural alignment.
+        """
+        messages = [
+            {"role": "system", "content": """You are an Elite Technical Recruiter. 
+            Analyze the fit between the Job Description and the Candidate Resume. 
+            Look past keywords; evaluate the depth of impact, seniority, and project complexity.
+            Return a JSON object with:
+            - relevance_score: float (0.0 to 1.0)
+            - reasoning: string (detailed explanation of the score)
+            - critical_gaps: list (what is missing?)
+            - top_strengths: list (why they are a great fit?)"""},
+            {"role": "user", "content": f"JOB DESCRIPTION:\n{jd_text}\n\nCANDIDATE RESUME:\n{resume_text}"}
+        ]
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.0
+        )
+        return json.loads(response.choices[0].message.content)

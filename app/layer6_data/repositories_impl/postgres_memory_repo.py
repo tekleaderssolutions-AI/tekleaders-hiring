@@ -15,7 +15,7 @@ class PostgresMemoryRepository:
         """
         # Search for the latest short_id with the prefix
         query = select(MemoryModel.short_id)\
-            .filter(MemoryModel.type == "job")\
+            .filter(MemoryModel.entity_type == "job")\
             .filter(MemoryModel.short_id.like(f"{prefix}%"))\
             .order_by(desc(MemoryModel.short_id))\
             .limit(1)
@@ -34,6 +34,10 @@ class PostgresMemoryRepository:
             next_num = 1
             
         return f"{prefix}{next_num:04d}"
+
+    async def get_by_id(self, memory_id: str) -> Optional[MemoryModel]:
+        result = await self.session.execute(select(MemoryModel).where(MemoryModel.id == memory_id))
+        return result.scalar_one_or_none()
 
     async def save(self, memory_model: MemoryModel) -> MemoryModel:
         self.session.add(memory_model)

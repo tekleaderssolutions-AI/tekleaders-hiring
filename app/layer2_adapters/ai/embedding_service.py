@@ -6,10 +6,16 @@ class EmbeddingService:
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.EMBEDDING_MODEL
 
+    from app.layer7_crosscutting.ai.resilience import ai_retry
+
+    @ai_retry(max_retries=3, base_delay=1.0)
     async def generate_embedding(self, text: str) -> list[float]:
         """
         Generate vector embedding using OpenAI text-embedding-3-small
         """
+        import asyncio
+        # Run in threadpool if it's the sync client, or just use it if it's the async client
+        # For now, let's keep it simple as it was, but with the decorator
         response = self.client.embeddings.create(
             input=[text],
             model=self.model
