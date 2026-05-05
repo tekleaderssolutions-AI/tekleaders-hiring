@@ -1,44 +1,37 @@
 import asyncio
 from sqlalchemy import text
 from app.database import engine
+from app.layer6_data.models import Base
 
 async def sync_schema():
+    """
+    ELITE STARTUP SCRIPT
+    Ensures the vector extension is enabled and all ORM tables are created.
+    Designed for clean-slate deployments.
+    """
     async with engine.begin() as conn:
-        print("Starting comprehensive schema synchronization for 'candidates' table...")
+        print("🚀 Starting Elite System Initialization...")
         
-        columns_to_add = [
-            ("summary", "TEXT"),
-            ("skills", "JSONB DEFAULT '[]'"),
-            ("experience", "JSONB DEFAULT '[]'"),
-            ("education", "JSONB DEFAULT '[]'"),
-            ("total_years_experience", "FLOAT DEFAULT 0.0"),
-            ("memory_id", "VARCHAR"),
-            ("candidate_metadata", "JSONB DEFAULT '{}'"),
-            ("first_name", "VARCHAR"),
-            ("last_name", "VARCHAR"),
-            ("phone", "VARCHAR"),
-            ("location", "VARCHAR")
-        ]
-
-        for col_name, col_type in columns_to_add:
-            try:
-                await conn.execute(text(f"ALTER TABLE candidates ADD COLUMN IF NOT EXISTS {col_name} {col_type}"))
-                print(f"- Column '{col_name}' ({col_type}) verified/added.")
-            except Exception as e:
-                print(f"- Error adding '{col_name}': {e}")
-
-        # Rename 'metadata' to 'candidate_metadata' if old column exists
+        # 1. Enable Vector Extension (Critical for pgvector)
         try:
-            result = await conn.execute(text(
-                "SELECT column_name FROM information_schema.columns WHERE table_name='candidates' AND column_name='metadata'"
-            ))
-            if result.fetchone():
-                await conn.execute(text("ALTER TABLE candidates RENAME COLUMN metadata TO candidate_metadata"))
-                print("- Column 'metadata' renamed to 'candidate_metadata'.")
+            print("- Enabling 'vector' extension...")
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            print("  [OK] Vector extension verified.")
         except Exception as e:
-            print(f"- Error renaming 'metadata': {e}")
+            print(f"  [ERROR] Failed to enable vector extension: {e}")
+            raise e
 
-        print("\nSchema sync complete!")
+        # 2. Create All Tables from Registry
+        try:
+            print("- Synchronizing ORM Models with Database...")
+            # Note: run_sync is used to bridge async SQLAlchemy with sync Base.metadata
+            await conn.run_sync(Base.metadata.create_all)
+            print("  [OK] All tables (Candidates, Resumes, Jobs, Versions, Memory, etc.) verified.")
+        except Exception as e:
+            print(f"  [ERROR] Schema synchronization failed: {e}")
+            raise e
+
+        print("\n✅ System Initialization Complete! Ready for AI Ingestion.")
 
 if __name__ == "__main__":
     asyncio.run(sync_schema())
