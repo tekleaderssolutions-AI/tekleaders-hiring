@@ -114,3 +114,54 @@ class TextProcessor:
             sections[key] = sections[key].strip()
             
         return sections
+
+    @staticmethod
+    def segment_resume(text: str) -> dict:
+        """
+        Step 6: Resume Section Segmentation
+        Splits a resume into semantic sections so the AI only reads what it needs.
+        Returns: dict with keys: contact, summary, skills, experience, education, other
+        """
+        sections = {
+            "contact": "",
+            "summary": "",
+            "skills": "",
+            "experience": "",
+            "education": "",
+            "other": ""
+        }
+
+        headers = {
+            "summary": [r"summary", r"objective", r"profile", r"about me", r"professional summary"],
+            "skills": [r"skills", r"technical skills", r"competencies", r"technologies", r"stack", r"expertise"],
+            "experience": [r"experience", r"work history", r"employment", r"career", r"work experience", r"professional experience"],
+            "education": [r"education", r"academic", r"qualification", r"degree", r"university", r"college"],
+            "contact": [r"contact", r"personal details", r"personal information"],
+        }
+
+        lines = text.split('\n')
+        # Assume the very first lines are contact info
+        current_section = "contact"
+
+        for i, line in enumerate(lines):
+            line_clean = line.strip().lower()
+            if not line_clean:
+                continue
+
+            found_header = False
+            for section_name, keywords in headers.items():
+                for kw in keywords:
+                    if re.search(fr"\b{kw}\b", line_clean) and len(line_clean) < 35:
+                        current_section = section_name
+                        found_header = True
+                        break
+                if found_header:
+                    break
+
+            if not found_header:
+                sections[current_section] += line + "\n"
+
+        for key in sections:
+            sections[key] = sections[key].strip()
+
+        return sections

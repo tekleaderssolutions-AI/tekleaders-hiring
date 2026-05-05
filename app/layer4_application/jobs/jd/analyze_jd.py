@@ -6,7 +6,10 @@ from app.layer7_crosscutting.jd.text_processor import TextProcessor
 from app.layer2_adapters.ai.jd.jd_analyzer import JDAnalyzerAgent
 from app.layer4_application.jobs.jd.normalize_jd import JDNormalizer
 from app.layer4_application.jobs.jd.enrich_jd import JDEnricher
+# Steps 10-14: Skill Ontology Engine
 from app.layer7_crosscutting.jd.skill_ontology import SkillOntology
+# Step 16: Seniority Enrichment (expected seniority in JD)
+from app.layer7_crosscutting.resume.seniority_enricher import SeniorityEnricher
 from app.layer2_adapters.ai.embedding_service import EmbeddingService
 from app.layer6_data.models.memory_model import MemoryModel
 
@@ -88,21 +91,54 @@ class AnalyzeJDUseCase:
         if not raw_text:
             raise Exception("Failed to parse file")
 
-        # 2. Preprocessing
+        # Step 4: Preprocessing
         clean_text = TextProcessor.clean_text(raw_text)
 
-        # 4. PII Redaction
+        # Step 5: PII Redaction
         redacted_text, pii_flag, redactions = TextProcessor.redact_pii(clean_text)
 
-        # 5. LLM Extraction
-        extracted_data = await self.analyzer.extract_structured_jd(redacted_text)
+        # Step 6: JD Segmentation — structure sections before AI extraction
+        sections = TextProcessor.segment_jd(clean_text)
+        structured_for_ai = (
+            f"[ROLE/INTRO]\n{sections.get('role', '')}\n\n"
+            f"[REQUIREMENTS/SKILLS]\n{sections.get('skills', '')}\n\n"
+            f"[EXPERIENCE]\n{sections.get('experience', '')}\n\n"
+            f"[RESPONSIBILITIES]\n{sections.get('responsibilities', '')}\n\n"
+            f"[EDUCATION]\n{sections.get('education', '')}"
+        )
 
-        # 7. Normalization
+        # Step 7: LLM Extraction — use structured text for better accuracy
+        extracted_data = await self.analyzer.extract_structured_jd(structured_for_ai)
+
+        # Step 9: Normalization
         extracted_data["experience"] = JDNormalizer.normalize_experience(extracted_data.get("experience"))
         extracted_data["salary"] = JDNormalizer.normalize_salary(extracted_data.get("salary"))
         extracted_data["location"] = JDNormalizer.normalize_location(extracted_data.get("location"))
 
-        # 12. Quality Scoring
+        # Steps 10-14: Skill Ontology — alias mapping, dedup, categorization, weighting
+        # Primary skills: treat as must-have (importance=must-have)
+        primary_raw = [{"name": s, "importance": "must-have"} for s in (extracted_data.get("primary_skills") or [])]
+        # Secondary skills: treat as preferred
+        secondary_raw = [{"name": s, "importance": "preferred"} for s in (extracted_data.get("secondary_skills") or [])]
+        enriched_primary = SkillOntology.normalize_skills(primary_raw)
+        enriched_secondary = SkillOntology.normalize_skills(secondary_raw)
+        # Store canonical skill names back for DB storage
+        extracted_data["primary_skills"] = [s["name"] for s in enriched_primary]
+        extracted_data["secondary_skills"] = [s["name"] for s in enriched_secondary]
+        extracted_data["enriched_primary_skills"] = enriched_primary
+        extracted_data["enriched_secondary_skills"] = enriched_secondary
+
+        # Step 16: Seniority Enrichment — detect what seniority the JD is looking for
+        exp = extracted_data.get("experience") or {}
+        exp_years_min = exp.get("min") or 0
+        seniority = SeniorityEnricher.detect_seniority(
+            current_title=extracted_data.get("role", ""),
+            total_years=float(exp_years_min),
+            work_experience=[]  # JDs don't have work history; title+years is enough
+        )
+        extracted_data["expected_seniority"] = seniority
+
+        # Quality Scoring
         quality_score = JDEnricher.calculate_quality_score(extracted_data)
         extracted_data["quality_score"] = quality_score
 
