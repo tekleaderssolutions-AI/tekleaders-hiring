@@ -5,6 +5,8 @@ from app.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.jd.jobs import router as jobs_router
 from app.api.v1.resume.candidates import router as candidates_router
+from app.api.v1.matching import router as matching_router
+from app.api.v1.feedback import router as feedback_router
 
 def create_app() -> FastAPI:
     # ... (existing setup)
@@ -40,6 +42,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(jobs_router, prefix="/api/v1")
     app.include_router(candidates_router, prefix="/api/v1")
+    app.include_router(matching_router, prefix="/api/v1")
+    app.include_router(feedback_router, prefix="/api/v1")
 
     @app.get("/health", tags=["Health"])
     async def health_check():
