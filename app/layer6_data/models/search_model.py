@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, JSON, ForeignKey, func
+from sqlalchemy import Column, String, DateTime, JSON, ForeignKey, Integer, func
 from pgvector.sqlalchemy import Vector
 from app.layer6_data.models.base import Base
 
@@ -18,6 +18,6 @@ class SearchSessionModel(Base):
     query_embedding = Column(Vector(1536), nullable=True) # The vector used for the search
     
     filters_json = Column(JSON, nullable=True)           # The structured filters applied
-    results_count = Column(Integer := 0)
+    results_count = Column(Integer, default=0)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())

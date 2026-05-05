@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON, func
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON, Float, func
 from sqlalchemy.orm import relationship
 from app.layer6_data.models.base import Base
 
@@ -37,7 +37,7 @@ class AgentStepModel(Base):
     output_data = Column(JSON, nullable=True)
     
     status = Column(String, default="completed")
-    latency_ms = Column(Float := 0.0)
+    latency_ms = Column(Float, default=0.0)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
