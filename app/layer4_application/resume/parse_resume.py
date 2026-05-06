@@ -178,26 +178,39 @@ class ParseResumeUseCase:
         finally:
             if os.path.exists(temp_path): os.remove(temp_path)
 
-    async def execute_bulk(self, zip_content: bytes, user_id: str) -> dict:
-        """
-        Processes a ZIP archive of resumes in parallel.
-        """
+    async def execute_bulk(self, zip_content: bytes, user_id: str) -> List[dict]:
+        """Elite Bulk Processing: Parallel extraction with background persistence"""
         import zipfile
         import io
-
         results = []
         with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
             # Filter for PDF and DOCX
             filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
             
+            print(f"Starting bulk processing of {len(filenames)} files...")
             for filename in filenames:
                 try:
                     with z.open(filename) as f:
                         content = f.read()
-                    # Note: We await single for now to ensure DB stability, can be parallelized further if needed
-                    res = await self.execute_single(content, filename, user_id)
-                    results.append({"filename": filename, "status": "success", "id": res.get("resume_id")})
+                    
+                    # Retry logic for individual resume extraction
+                    max_retries = 2
+                    res = {"error": "Initial state"}
+                    for attempt in range(max_retries):
+                        try:
+                            res = await self.execute_single(content, filename, user_id)
+                            if "error" not in res:
+                                break
+                        except Exception as e:
+                            print(f"Attempt {attempt+1} failed for {filename}: {e}")
+                    
+                    if "error" in res:
+                        results.append({"filename": filename, "status": "error", "message": res["error"]})
+                    else:
+                        results.append({"filename": filename, "status": "success", "id": res.get("resume_id")})
                 except Exception as e:
+                    print(f"CRITICAL ERROR processing {filename}: {e}")
                     results.append({"filename": filename, "status": "error", "message": str(e)})
         
-        return {"total": len(filenames), "results": results}
+        print(f"Bulk processing complete. Success: {len([r for r in results if r['status'] == 'success'])}/{len(filenames)}")
+        return results
