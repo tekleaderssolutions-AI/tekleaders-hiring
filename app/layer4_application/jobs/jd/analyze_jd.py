@@ -98,9 +98,23 @@ class AnalyzeJDUseCase:
             job = await self.job_repo.get_by_id(job_id) if job_id else None
             
             if not job:
-                actual_job_id = job_id or str(uuid.uuid4())
-                job = JobModel(id=actual_job_id, company_id=company_id, created_by=user_id, current_title=extracted_data.get("role"), status=JobStatus.OPEN)
-                await self.job_repo.create_job(job)
+                from app.layer5_domain.entities.jd.job import Job
+                job_entity = Job(
+                    title=extracted_data.get("role") or "Untitled Job",
+                    description=redacted_text,
+                    employment_type=extracted_data.get("employment_type"),
+                    experience_level=extracted_data.get("experience_level"),
+                    company_id=company_id,
+                    created_by=user_id,
+                    requirements=extracted_data.get("requirements"),
+                    benefits=extracted_data.get("benefits"),
+                    industry=extracted_data.get("industry"),
+                    job_function=extracted_data.get("job_function"),
+                    keywords=extracted_data.get("skills") or [],
+                    status=JobStatus.OPEN.value
+                )
+                job_entity = await self.job_repo.create(job_entity)
+                actual_job_id = job_entity.id
             else:
                 actual_job_id = job.id
                 job.current_title = extracted_data.get("role") or job.current_title
