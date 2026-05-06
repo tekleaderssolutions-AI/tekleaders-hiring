@@ -1,6 +1,7 @@
 from app.layer5_domain.entities.jd.job import Job
 from app.layer5_domain.repositories.jd.job_repository import JobRepository
 from app.schemas.jd.job_schemas import JobCreate
+from datetime import datetime
 
 class CreateJobUseCase:
     def __init__(self, job_repo: JobRepository):
@@ -35,6 +36,8 @@ class CreateJobUseCase:
             salary_min=payload.salary_min,
             salary_max=payload.salary_max,
             salary_currency=payload.salary_currency,
-            status=get_val(payload.status) if payload.status else "draft"
+            status=get_val(payload.status) if payload.status else "draft",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
         return await self.job_repo.create(new_job)

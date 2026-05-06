@@ -113,25 +113,27 @@ class JobRead(BaseModel):
     company_id: str
     created_by: str
     title: str
-    job_code: Optional[str]
-    department: Optional[str]
-    workplace_type: WorkplaceType
-    location: Optional[str]
+    job_code: Optional[str] = None
+    department: Optional[str] = None
+    workplace_type: Any = None
+    location: Optional[str] = None
     description: str
-    requirements: Optional[str]
-    benefits: Optional[str]
-    industry: Optional[CompanyIndustry]
-    job_function: Optional[JobFunction]
-    employment_type: EmploymentType
-    experience_level: ExperienceLevel
-    education_level: Optional[EducationLevel]
-    keywords: Optional[List[str]]
-    salary_min: Optional[int]
-    salary_max: Optional[int]
-    salary_currency: Optional[str]
-    status: JobStatus
-    created_at: datetime
-    updated_at: Optional[datetime]
+    requirements: Optional[str] = None
+    benefits: Optional[str] = None
+    industry: Optional[Any] = None
+    job_function: Optional[Any] = None
+    employment_type: Any
+    experience_level: Any
+    education_level: Optional[Any] = None
+    keywords: Optional[List[str]] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    salary_currency: Optional[str] = None
+    status: Any = None
+    created_at: Any = None
+    updated_at: Any = None
 
     class Config:
         from_attributes = True
+        # Allow population by field name even if types are slightly mismatched
+        populate_by_name = True
