@@ -9,12 +9,13 @@ from app.layer6_data.repositories_impl.resume.postgres_candidate_repo import Pos
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
-async def process_bulk_resumes(content: bytes, user_id: str, db: AsyncSession):
-    """Background task to process ZIP resumes"""
-    # Note: In a real background task with AsyncSession, we need a fresh session 
-    # but for FastAPI BackgroundTasks within the same request lifecycle, this is okay.
-    use_case = ParseResumeUseCase(db)
-    await use_case.execute_bulk(content, user_id)
+async def process_bulk_resumes(content: bytes, user_id: str):
+    """Background task to process ZIP resumes with a fresh session"""
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        use_case = ParseResumeUseCase(db)
+        await use_case.execute_bulk(content, user_id)
+        await db.commit()
 
 @router.post(
     "/upload",
@@ -32,7 +33,7 @@ async def upload_resumes(
     
     # 1. Check if it's a Bulk ZIP -> Run in Background
     if filename.endswith(".zip"):
-        background_tasks.add_task(process_bulk_resumes, content, current_user.id, db)
+        background_tasks.add_task(process_bulk_resumes, content, current_user.id)
         return {
             "mode": "bulk",
             "status": "processing",
