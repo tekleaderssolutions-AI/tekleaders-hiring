@@ -27,6 +27,16 @@ class PostgresUserRepository(UserRepository):
 
     async def create(self, user: User) -> User:
         user_id = str(uuid.uuid4())
+        from app.layer6_data.models.user_model import UserRole
+        
+        # Ensure role is a valid Enum or default to RECRUITER
+        db_role = UserRole.RECRUITER
+        if user.role:
+            try:
+                db_role = UserRole(user.role)
+            except ValueError:
+                db_role = UserRole.RECRUITER
+
         user_model = UserModel(
             id=user_id,
             email=user.email,
@@ -35,8 +45,8 @@ class PostgresUserRepository(UserRepository):
             last_name=user.last_name,
             google_id=user.google_id,
             is_active=user.is_active,
-            company_id=user.company_id,
-            role=user.role
+            company_id=user.company_id, # Safely None for initial signup
+            role=db_role
         )
         self.session.add(user_model)
         await self.session.flush()
