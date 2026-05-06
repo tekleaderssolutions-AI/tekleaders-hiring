@@ -60,7 +60,7 @@ class FetchAndAlignUseCase:
                     (1 - (m.embedding <=> :jd_vector)) as best_similarity
                 FROM memories m
                 JOIN resumes r ON m.resume_id = r.id
-                WHERE m.entity_type = 'resume_chunk' AND m.company_id = :company_id AND m.cluster = :cluster
+                WHERE m.entity_type = 'resume_chunk' AND m.company_id = :company_id
                   AND r.is_active = True AND m.is_active = True
                 ORDER BY r.id, best_similarity DESC
             ) as best_chunks
@@ -70,7 +70,6 @@ class FetchAndAlignUseCase:
         result_proxy = await self.db.execute(vector_query, {
             "jd_vector": jd_vector_str, 
             "company_id": company_id, 
-            "cluster": jd_cluster, 
             "limit": top_k * 5
         })
         candidates = result_proxy.mappings().all()
