@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional, List, Any
 
 from app.dependencies import get_db, get_current_user
 from app.layer5_domain.entities.user import User
@@ -12,10 +12,24 @@ router = APIRouter(prefix="/feedback", tags=["Feedback"])
 
 class FeedbackCreate(BaseModel):
     application_id: str
-    outcome: FeedbackOutcome
+    outcome: Any
     recruiter_score: Optional[float] = None
     recruiter_notes: Optional[str] = None
     feedback_tags: Optional[List[str]] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_outcome(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "outcome" in data:
+            val = data["outcome"]
+            if isinstance(val, str):
+                data["outcome"] = val.lower().strip()
+                # Check if it's a valid Enum member after normalization
+                try:
+                    data["outcome"] = FeedbackOutcome(data["outcome"])
+                except ValueError:
+                    pass # Let validation fail later if truly invalid
+        return data
 
 @router.post(
     "/outcome",
