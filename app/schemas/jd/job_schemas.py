@@ -6,83 +6,106 @@ from app.layer6_data.models.jd.job_model import (
     CompanyIndustry, JobFunction, EducationLevel
 )
 
+def normalize_enum_value(value: Any, enum_class: Any) -> Any:
+    """Helper to convert UI strings to Enum members."""
+    if not value:
+        return None
+    if isinstance(value, enum_class):
+        return value
+    if isinstance(value, str):
+        # Normalize: 'Full Time' -> 'full_time'
+        normalized = value.lower().strip().replace(" ", "_")
+        # Try to find match in Enum
+        for member in enum_class:
+            if member.value == normalized:
+                return member
+    return value # Let Pydantic handle the error if no match found
+
 class JobCreate(BaseModel):
     title: str = Field(..., max_length=80)
     job_code: Optional[str] = None
     department: Optional[str] = None
     
-    workplace_type: WorkplaceType = WorkplaceType.ON_SITE
+    workplace_type: Any = WorkplaceType.ON_SITE
     location: Optional[str] = None
     
     description: str = Field(..., min_length=10)
     requirements: Optional[str] = None
     benefits: Optional[str] = None
     
-    industry: Optional[CompanyIndustry] = None
-    job_function: Optional[JobFunction] = None
+    industry: Any = None
+    job_function: Any = None
     
-    employment_type: EmploymentType
-    experience_level: ExperienceLevel
-    education_level: Optional[EducationLevel] = None
+    employment_type: Any
+    experience_level: Any
+    education_level: Any = None
     keywords: Optional[List[str] | str] = []
     
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     salary_currency: Optional[str] = "INR"
-    status: Optional[JobStatus] = JobStatus.DRAFT
+    status: Any = JobStatus.DRAFT
 
     @model_validator(mode='before')
     @classmethod
-    def normalize_enums(cls, data: Any) -> Any:
-        """
-        ELITE NORMALIZER: 
-        Automatically converts 'Full Time' -> 'full_time', 'Finance' -> 'finance', etc.
-        This prevents UI validation errors.
-        """
-        if isinstance(data, dict):
-            enum_fields = [
-                "industry", "job_function", "employment_type", 
-                "experience_level", "education_level", "workplace_type"
-            ]
-            for field in enum_fields:
-                val = data.get(field)
-                if isinstance(val, str):
-                    # Lowercase and replace space with underscore
-                    data[field] = val.lower().strip().replace(" ", "_")
+    def process_enums(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+            
+        # Map of field names to their respective Enum classes
+        mapping = {
+            "industry": CompanyIndustry,
+            "job_function": JobFunction,
+            "employment_type": EmploymentType,
+            "experience_level": ExperienceLevel,
+            "education_level": EducationLevel,
+            "workplace_type": WorkplaceType,
+            "status": JobStatus
+        }
+        
+        for field, enum_cls in mapping.items():
+            if field in data:
+                data[field] = normalize_enum_value(data[field], enum_cls)
+        
         return data
 
 class JobUpdate(BaseModel):
     title: Optional[str] = Field(None, max_length=80)
     job_code: Optional[str] = None
     department: Optional[str] = None
-    workplace_type: Optional[WorkplaceType] = None
+    workplace_type: Optional[Any] = None
     location: Optional[str] = None
     description: Optional[str] = None
     requirements: Optional[str] = None
     benefits: Optional[str] = None
-    industry: Optional[CompanyIndustry] = None # Fixed field name consistency
-    job_function: Optional[JobFunction] = None
-    employment_type: Optional[EmploymentType] = None
-    experience_level: Optional[ExperienceLevel] = None
-    education_level: Optional[EducationLevel] = None
+    industry: Optional[Any] = None
+    job_function: Optional[Any] = None
+    employment_type: Optional[Any] = None
+    experience_level: Optional[Any] = None
+    education_level: Optional[Any] = None
     keywords: Optional[List[str]] = None
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     salary_currency: Optional[str] = None
-    status: Optional[JobStatus] = None
+    status: Optional[Any] = None
 
     @model_validator(mode='before')
     @classmethod
-    def normalize_enums(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            enum_fields = [
-                "industry", "job_function", "employment_type", 
-                "experience_level", "education_level", "workplace_type"
-            ]
-            for field in enum_fields:
-                val = data.get(field)
-                if isinstance(val, str):
-                    data[field] = val.lower().strip().replace(" ", "_")
+    def process_enums(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        mapping = {
+            "industry": CompanyIndustry,
+            "job_function": JobFunction,
+            "employment_type": EmploymentType,
+            "experience_level": ExperienceLevel,
+            "education_level": EducationLevel,
+            "workplace_type": WorkplaceType,
+            "status": JobStatus
+        }
+        for field, enum_cls in mapping.items():
+            if field in data:
+                data[field] = normalize_enum_value(data[field], enum_cls)
         return data
 
 class JobRead(BaseModel):
