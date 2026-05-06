@@ -179,38 +179,49 @@ class ParseResumeUseCase:
             if os.path.exists(temp_path): os.remove(temp_path)
 
     async def execute_bulk(self, zip_content: bytes, user_id: str) -> List[dict]:
-        """Elite Bulk Processing: Parallel extraction with background persistence"""
+        """Elite Bulk Processing: Parallel extraction with concurrency control"""
+        import asyncio
         import zipfile
         import io
+        from app.database import AsyncSessionLocal
+        
         results = []
-        with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
-            # Filter for PDF and DOCX
-            filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
-            
-            print(f"Starting bulk processing of {len(filenames)} files...")
-            for filename in filenames:
-                try:
-                    with z.open(filename) as f:
-                        content = f.read()
+        semaphore = asyncio.Semaphore(5) # Process 5 at a time
+
+        async def process_file(filename, content):
+            async with semaphore:
+                async with AsyncSessionLocal() as db:
+                    # Create a temporary use-case with its own session for thread-safety
+                    temp_use_case = ParseResumeUseCase(db)
                     
-                    # Retry logic for individual resume extraction
                     max_retries = 2
                     res = {"error": "Initial state"}
                     for attempt in range(max_retries):
                         try:
-                            res = await self.execute_single(content, filename, user_id)
+                            res = await temp_use_case.execute_single(content, filename, user_id)
                             if "error" not in res:
                                 break
                         except Exception as e:
                             print(f"Attempt {attempt+1} failed for {filename}: {e}")
                     
                     if "error" in res:
-                        results.append({"filename": filename, "status": "error", "message": res["error"]})
+                        return {"filename": filename, "status": "error", "message": res["error"]}
                     else:
-                        results.append({"filename": filename, "status": "success", "id": res.get("resume_id")})
-                except Exception as e:
-                    print(f"CRITICAL ERROR processing {filename}: {e}")
-                    results.append({"filename": filename, "status": "error", "message": str(e)})
+                        return {"filename": filename, "status": "success", "id": res.get("resume_id")}
+
+        with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
+            # Filter for PDF and DOCX
+            filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
+            
+            print(f"Starting parallel bulk processing of {len(filenames)} files...")
+            tasks = []
+            for filename in filenames:
+                with z.open(filename) as f:
+                    content = f.read()
+                tasks.append(process_file(filename, content))
+            
+            # Execute all tasks in parallel
+            results = await asyncio.gather(*tasks)
         
         print(f"Bulk processing complete. Success: {len([r for r in results if r['status'] == 'success'])}/{len(filenames)}")
         return results
