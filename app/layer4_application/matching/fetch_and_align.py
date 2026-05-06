@@ -48,16 +48,18 @@ class FetchAndAlignUseCase:
         if not jd_memory: raise ValueError("JD embedding missing.")
         jd_embedding, jd_cluster = jd_memory
 
-        # 4. Aggregated Vector Retrieval
+        # 4. Aggregated Vector Retrieval (Elite Pattern: DISTINCT ON to avoid JSON grouping errors)
         vector_query = text("""
-            SELECT 
-                r.id as resume_id, r.candidate_id, r.skills_json, r.raw_text, r.metadata_json as resume_metadata,
-                MAX(1 - (m.embedding <=> :jd_vector)) as best_similarity
-            FROM memories m
-            JOIN resumes r ON m.resume_id = r.id
-            WHERE m.entity_type = 'resume_chunk' AND m.company_id = :company_id AND m.cluster = :cluster
-              AND r.is_active = True AND m.is_active = True
-            GROUP BY r.id, r.candidate_id, r.skills_json, r.raw_text, r.metadata_json
+            SELECT * FROM (
+                SELECT DISTINCT ON (r.id)
+                    r.id as resume_id, r.candidate_id, r.skills_json, r.raw_text, r.metadata_json as resume_metadata,
+                    (1 - (m.embedding <=> :jd_vector)) as best_similarity
+                FROM memories m
+                JOIN resumes r ON m.resume_id = r.id
+                WHERE m.entity_type = 'resume_chunk' AND m.company_id = :company_id AND m.cluster = :cluster
+                  AND r.is_active = True AND m.is_active = True
+                ORDER BY r.id, best_similarity DESC
+            ) as best_chunks
             ORDER BY best_similarity DESC LIMIT :limit
         """)
 
