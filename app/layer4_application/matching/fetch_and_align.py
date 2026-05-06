@@ -85,8 +85,14 @@ class FetchAndAlignUseCase:
         for cand in candidates:
             # Skill Alignment
             cand_skills = set(cand["skills_json"] or [])
-            p_match_count = len(cand_skills.intersection(primary_skills))
-            skills_score = (p_match_count / len(primary_skills)) if primary_skills else 1.0
+            semantic_score = float(cand["best_similarity"])
+            
+            # ELITE FIX: If no primary skills defined, use semantic score as fallback to ensure variety
+            if primary_skills:
+                p_match_count = len(cand_skills.intersection(primary_skills))
+                skills_score = (p_match_count / len(primary_skills))
+            else:
+                skills_score = semantic_score
             
             # Penalties with AI Multipliers
             penalty = 1.0
