@@ -85,28 +85,31 @@ class FetchAndAlignUseCase:
         for cand in candidates:
             # Skill Alignment
             cand_skills = set(cand["skills_json"] or [])
-            semantic_score = float(cand["best_similarity"])
+            # ELITE BOOST: Standardize similarity to be more human-readable (0.6 semantic often = 85% match in human terms)
+            # We map 0.3-1.0 range to a 0-1.0 range for better UX
+            semantic_score_boosted = max(0, (semantic_score - 0.3) / 0.7) if semantic_score > 0.3 else (semantic_score * 0.5)
             
-            # ELITE FIX: If no primary skills defined, use semantic score as fallback to ensure variety
+            # ELITE FIX: If no primary skills defined, use the boosted semantic score
             if primary_skills:
                 p_match_count = len(cand_skills.intersection(primary_skills))
                 skills_score = (p_match_count / len(primary_skills))
             else:
-                skills_score = semantic_score
+                skills_score = semantic_score_boosted
             
-            # Penalties with AI Multipliers
+            # Penalties with AI Multipliers (Gentle Adjustment)
             penalty = 1.0
             cand_exp = float((cand["resume_metadata"] or {}).get("seniority", {}).get("total_years") or 0)
             if cand_exp < min_exp:
+                # Severity is how much they are missing. We cap the penalty at 20% max.
                 severity = (min_exp - cand_exp) / min_exp
-                # Using weights["experience_multiplier"]
-                penalty *= (1.0 - (severity * 0.3 * weights.get("experience_multiplier", 1.0)))
+                penalty *= (1.0 - (severity * 0.2 * weights.get("experience_multiplier", 1.0)))
 
-            semantic_score = float(cand["best_similarity"])
-            
             # CALCULATE FINAL SCORE USING AI WEIGHTS
-            hybrid_score = ((weights["semantic_weight"] * semantic_score) + (weights["skills_weight"] * skills_score)) * penalty
-            hybrid_score_100 = round(hybrid_score * 100, 2)
+            hybrid_score = ((weights["semantic_weight"] * semantic_score_boosted) + (weights["skills_weight"] * skills_score)) * penalty
+            
+            # Final result should be realistic. Most candidates should fall in 60-95% range if they were sourced.
+            hybrid_score_100 = round(hybrid_score * 100, 1)
+            if hybrid_score_100 > 98.0: hybrid_score_100 = 98.0 # Cap for realism
 
             matches.append({
                 "resume_id": cand["resume_id"], 
@@ -116,7 +119,7 @@ class FetchAndAlignUseCase:
                 "email": cand["email"],
                 "raw_text": cand["raw_text"], 
                 "initial_score": hybrid_score_100,
-                "strategy_plan": weights # Show the recruiter the AI's weighting plan
+                "strategy_plan": weights 
             })
 
         # (Caching and Reranking logic follows...)

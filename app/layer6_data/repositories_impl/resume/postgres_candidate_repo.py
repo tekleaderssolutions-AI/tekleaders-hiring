@@ -98,3 +98,11 @@ class PostgresCandidateRepository:
     async def list_candidates(self, limit: int = 100, offset: int = 0) -> List[CandidateModel]:
         result = await self.session.execute(select(CandidateModel).limit(limit).offset(offset))
         return result.scalars().all()
+
+    async def count_candidates(self) -> int:
+        """
+        Returns total count of candidates for progress tracking.
+        """
+        from sqlalchemy import func
+        result = await self.session.execute(select(func.count(CandidateModel.id)))
+        return result.scalar_one()

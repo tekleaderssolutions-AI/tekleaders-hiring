@@ -35,16 +35,35 @@ async def upload_resumes(
     if filename.endswith(".zip"):
         import zipfile
         import io
+        import hashlib
+        
         with zipfile.ZipFile(io.BytesIO(content)) as z:
             filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
             total_count = len(filenames)
+            
+            # Pre-scan for duplicates within the ZIP itself
+            seen_hashes = set()
+            unique_count = 0
+            duplicate_count = 0
+            
+            for fname in filenames:
+                with z.open(fname) as f:
+                    f_content = f.read()
+                    f_hash = hashlib.md5(f_content).hexdigest()
+                    if f_hash in seen_hashes:
+                        duplicate_count += 1
+                    else:
+                        seen_hashes.add(f_hash)
+                        unique_count += 1
             
         background_tasks.add_task(process_bulk_resumes, content, current_user.id)
         return {
             "mode": "bulk",
             "status": "processing",
             "total_files": total_count,
-            "message": f"Processing {total_count} resumes in the background."
+            "unique_files": unique_count,
+            "duplicate_files": duplicate_count,
+            "message": f"Processing {unique_count} unique resumes. {duplicate_count} duplicates skipped."
         }
     
     # 2. Otherwise process as a Single File
@@ -70,6 +89,18 @@ async def list_candidates(
     repo = PostgresCandidateRepository(db)
     candidates = await repo.list_candidates(limit=limit, offset=offset)
     return candidates
+
+@router.get(
+    "/stats",
+    summary="Get candidate processing stats"
+)
+async def get_candidate_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    repo = PostgresCandidateRepository(db)
+    count = await repo.count_candidates() # I will add this method to the repo
+    return {"total_count": count}
 
 @router.get(
     "/{candidate_id}",
