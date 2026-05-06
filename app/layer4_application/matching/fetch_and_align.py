@@ -85,32 +85,37 @@ class FetchAndAlignUseCase:
         for cand in candidates:
             # Skill Alignment
             cand_skills = set(cand["skills_json"] or [])
-            semantic_score = float(cand["best_similarity"])
+            # ELITE OPTIMISTIC BOOST: 
+            # Recruiter-friendly curve: even a 0.2 base similarity is often a "decent" fit in human terms.
+            # We use an optimistic boost: boosted = (base^0.5) * 0.9 + 0.1
+            # 0.15 base -> ~45% match
+            # 0.40 base -> ~67% match
+            # 0.60 base -> ~80% match
+            semantic_score_boosted = (semantic_score ** 0.5) * 0.85 + 0.1
             
-            # ELITE BOOST: Standardize similarity to be more human-readable (0.6 semantic often = 85% match in human terms)
-            # We map 0.3-1.0 range to a 0-1.0 range for better UX
-            semantic_score_boosted = max(0, (semantic_score - 0.3) / 0.7) if semantic_score > 0.3 else (semantic_score * 0.5)
-            
-            # ELITE FIX: If no primary skills defined, use the boosted semantic score
+            # ELITE FIX: If no primary skills defined, we rely on the optimistic semantic match
             if primary_skills:
                 p_match_count = len(cand_skills.intersection(primary_skills))
-                skills_score = (p_match_count / len(primary_skills))
+                # Skills matching is binary, so we give it a slight boost too
+                skills_score = min(1.0, (p_match_count / len(primary_skills)) * 1.2)
             else:
                 skills_score = semantic_score_boosted
             
-            # Penalties with AI Multipliers (Gentle Adjustment)
+            # Penalties with AI Multipliers (Very Gentle)
             penalty = 1.0
             cand_exp = float((cand["resume_metadata"] or {}).get("seniority", {}).get("total_years") or 0)
             if cand_exp < min_exp:
-                # Severity is how much they are missing. We cap the penalty at 20% max.
+                # Experience is just one factor; only penalize 15% max for juniors applying to senior roles
                 severity = (min_exp - cand_exp) / min_exp
-                penalty *= (1.0 - (severity * 0.2 * weights.get("experience_multiplier", 1.0)))
+                penalty *= (1.0 - (severity * 0.15))
 
-            # CALCULATE FINAL SCORE USING AI WEIGHTS
+            # CALCULATE FINAL SCORE
+            # We give more weight to the "Vibe" (Semantic) if skills are missing
             hybrid_score = ((weights["semantic_weight"] * semantic_score_boosted) + (weights["skills_weight"] * skills_score)) * penalty
             
-            # Final result should be realistic. Most candidates should fall in 60-95% range if they were sourced.
             hybrid_score_100 = round(hybrid_score * 100, 1)
+            # Ensure it feels professional (no one is 100% perfect, but top is 90s)
+            hybrid_score_100 = min(98.5, max(15.0, hybrid_score_100))
             if hybrid_score_100 > 98.0: hybrid_score_100 = 98.0 # Cap for realism
 
             matches.append({
