@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, DateTime, JSON, Boolean
-from app.database import Base
+from app.layer6_data.models.base import Base
 from datetime import datetime
 
 class BulkUploadModel(Base):

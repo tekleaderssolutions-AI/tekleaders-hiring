@@ -21,13 +21,13 @@ from app.layer6_data.models.employee_model import EmployeeModel     # noqa: F401
 from app.layer6_data.models.ai_decision_model import AIDecisionModel  # noqa: F401
 from app.layer6_data.models.audit_log_model import AuditLogModel    # noqa: F401
 from app.layer6_data.models.notification_model import NotificationModel  # noqa: F401
-from app.layer6_data.models.token_model import TokenModel           # noqa: F401
+from app.layer6_data.models.resume.bulk_upload_model import BulkUploadModel # noqa: F401
 from app.layer6_data.models.memory_model import MemoryModel         # noqa: F401
 
 __all__ = [
     "Base",
     "CompanyModel", "UserModel", "JobModel", "JobVersionModel", 
-    "CandidateModel", "ResumeModel",
+    "CandidateModel", "ResumeModel", "BulkUploadModel",
     "ApplicationModel", "CandidateEvaluationModel", "ApplicationFeedbackModel",
     "SearchSessionModel", "AgentRunModel", "AgentStepModel",
     "InterviewModel", "EmployeeModel",
