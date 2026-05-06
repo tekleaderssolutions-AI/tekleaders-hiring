@@ -85,6 +85,8 @@ class FetchAndAlignUseCase:
         for cand in candidates:
             # Skill Alignment
             cand_skills = set(cand["skills_json"] or [])
+            semantic_score = float(cand["best_similarity"])
+            
             # ELITE BOOST: Standardize similarity to be more human-readable (0.6 semantic often = 85% match in human terms)
             # We map 0.3-1.0 range to a 0-1.0 range for better UX
             semantic_score_boosted = max(0, (semantic_score - 0.3) / 0.7) if semantic_score > 0.3 else (semantic_score * 0.5)
