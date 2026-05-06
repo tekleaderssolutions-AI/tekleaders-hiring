@@ -58,3 +58,4 @@ class ApplicationModel(Base):
     job_version = relationship("JobVersionModel", back_populates="applications")
     evaluations = relationship("CandidateEvaluationModel", back_populates="application", cascade="all, delete-orphan")
     feedback = relationship("ApplicationFeedbackModel", back_populates="application", uselist=False)
+    interviews = relationship("InterviewModel", back_populates="application", cascade="all, delete-orphan")
