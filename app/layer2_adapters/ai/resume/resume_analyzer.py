@@ -11,39 +11,30 @@ class ResumeAnalyzerAgent:
     def get_function_schema(self):
         return {
             "name": "extract_resume",
-            "description": "Extract structured candidate information from a resume",
+            "description": "Extract structured candidate information and functional cluster from a resume",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "candidate_name": {"type": "string"},
                     "email": {"type": "string"},
-                    "phone": {"type": "string"},
                     "current_title": {"type": "string"},
-                    "location": {"type": "string"},
+                    "job_cluster": {
+                        "type": "string", 
+                        "enum": ["engineering", "management", "data_science", "marketing", "sales", "hr", "finance", "legal", "customer_service", "other"],
+                        "description": "The functional category this candidate's experience belongs to."
+                    },
                     "total_experience_years": {"type": "number"},
                     "skills": {"type": "array", "items": {"type": "string"}},
-                    "work_experience": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "title": {"type": "string"},
-                                "company": {"type": "string"},
-                                "duration": {"type": "string"},
-                                "responsibilities": {"type": "array", "items": {"type": "string"}}
-                            }
-                        }
-                    },
                     "summary": {"type": "string"}
                 },
-                "required": ["candidate_name"]
+                "required": ["candidate_name", "job_cluster"]
             }
         }
 
     @ai_retry(max_retries=3)
     async def analyze(self, text: str) -> dict:
         messages = [
-            {"role": "system", "content": "You are an expert recruitment assistant. Extract highly accurate structured data."},
+            {"role": "system", "content": "You are an expert recruiter. Extract data and categorize the candidate into a functional cluster (engineering, sales, etc)."},
             {"role": "user", "content": f"Extract candidate info:\n\n{text}"}
         ]
         response = self.client.chat.completions.create(
@@ -57,19 +48,10 @@ class ResumeAnalyzerAgent:
 
     @ai_retry(max_retries=3)
     async def evaluate_match(self, jd_text: str, resume_text: str) -> dict:
-        """
-        ELITE RERANKER: Performs a deep-dive comparison between JD and Resume.
-        Looks for depth of experience, leadership, and cultural alignment.
-        """
         messages = [
             {"role": "system", "content": """You are an Elite Technical Recruiter. 
             Analyze the fit between the Job Description and the Candidate Resume. 
-            Look past keywords; evaluate the depth of impact, seniority, and project complexity.
-            Return a JSON object with:
-            - relevance_score: float (0.0 to 1.0)
-            - reasoning: string (detailed explanation of the score)
-            - critical_gaps: list (what is missing?)
-            - top_strengths: list (why they are a great fit?)"""},
+            Return a JSON object with: relevance_score, reasoning, critical_gaps, top_strengths."""},
             {"role": "user", "content": f"JOB DESCRIPTION:\n{jd_text}\n\nCANDIDATE RESUME:\n{resume_text}"}
         ]
 

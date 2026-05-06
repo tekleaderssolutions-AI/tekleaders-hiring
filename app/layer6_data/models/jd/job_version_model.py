@@ -25,6 +25,10 @@ class JobVersionModel(Base):
     embedding_model = Column(String, nullable=True)
     embedding_version = Column(String, nullable=True)
     
+    # Elite Layer: AI-Driven Scoring Strategy
+    # e.g. {"semantic_weight": 0.4, "skills_weight": 0.6, "experience_multiplier": 1.2}
+    scoring_weights = Column(JSON, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

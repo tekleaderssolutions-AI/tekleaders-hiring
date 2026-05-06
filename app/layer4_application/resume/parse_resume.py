@@ -141,6 +141,32 @@ class ParseResumeUseCase:
             
             persistence_data = await self._get_or_run_step(run_id, "persistence", run_persistence)
 
+            # Stage 15-17: Granular Memory & Vector Isolation
+            async def run_memory():
+                cluster = extracted_data.get("job_cluster", "other")
+                res = await self.db.execute(select(UserModel).where(UserModel.id == user_id))
+                user_model = res.scalar_one_or_none()
+                company_id = user_model.company_id if user_model else None
+
+                # Create granular chunks for best-similarity matching
+                chunks = [
+                    ("resume_summary", f"Role: {extracted_data.get('current_title')}. Summary: {extracted_data.get('summary')}"),
+                    ("resume_skills", f"Skills: {', '.join(enrichment_data['skills'])}"),
+                ]
+                
+                for idx, (c_type, c_text) in enumerate(chunks):
+                    vector = await self.embedder.generate_embedding(c_text)
+                    memory = MemoryModel(
+                        id=str(uuid.uuid4()), resume_id=persistence_data["resume_id"], company_id=company_id,
+                        cluster=cluster, entity_type="resume_chunk", chunk_type=c_type,
+                        chunk_index=idx, text=c_text, embedding=vector,
+                        embedding_model=self.embedding_model, embedding_version=self.embedding_version, is_active=True
+                    )
+                    self.db.add(memory)
+                return {"cluster": cluster}
+
+            await self._get_or_run_step(run_id, "vector_indexing", run_memory)
+
             # Stage 15+: Granular Memory (Priority 1 logic)
             # This is skipped if already in memories table
             # ... (Implementation similar to above)

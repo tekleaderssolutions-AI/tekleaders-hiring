@@ -11,47 +11,45 @@ class JDAnalyzerAgent:
     def get_function_schema(self):
         return {
             "name": "extract_jd",
-            "description": "Extract structured fields from a job description",
+            "description": "Extract structured fields, strategic weights, and functional cluster from a job description",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "role": {"type": ["string", "null"]},
-                    "team": {"type": ["string", "null"]},
-                    "location": {"type": ["string", "null"]},
-                    "employment_type": {"type": ["string", "null"]},
+                    "job_cluster": {
+                        "type": "string", 
+                        "enum": ["engineering", "management", "data_science", "marketing", "sales", "hr", "finance", "legal", "customer_service", "other"],
+                        "description": "The functional category this job belongs to."
+                    },
                     "experience": {
                         "type": ["object", "null"],
                         "properties": {
                             "min": {"type": ["integer", "null"]},
                             "max": {"type": ["integer", "null"]},
-                            "units": {"type": ["string", "null"]},
-                        },
-                    },
-                    "salary": {
-                        "type": ["object", "null"],
-                        "properties": {
-                            "min": {"type": ["number", "null"]},
-                            "max": {"type": ["number", "null"]},
-                            "currency": {"type": ["string", "null"]},
                         },
                     },
                     "primary_skills": {"type": "array", "items": {"type": "string"}},
-                    "secondary_skills": {"type": "array", "items": {"type": "string"}},
-                    "responsibilities": {"type": "array", "items": {"type": "string"}},
-                    "education": {"type": "array", "items": {"type": "string"}},
-                    "nice_to_have": {"type": "array", "items": {"type": "string"}},
-                    "keywords": {"type": "array", "items": {"type": "string"}},
+                    "scoring_weights": {
+                        "type": "object",
+                        "properties": {
+                            "semantic_weight": {"type": "number"},
+                            "skills_weight": {"type": "number"},
+                            "experience_multiplier": {"type": "number"}
+                        }
+                    },
+                    "summary": {"type": "string"}
                 },
+                "required": ["role", "job_cluster", "scoring_weights"]
             },
         }
 
     async def extract_structured_jd(self, text: str) -> dict:
-        """
-        Step 5: LLM Extraction - OpenAI Function Calling
-        """
         messages = [
-            {"role": "system", "content": "You are a precise JD parsing assistant. Extract structured fields from the job description."},
-            {"role": "user", "content": f"Extract structured fields from this job description:\n\n{text}"}
+            {"role": "system", "content": """You are an Elite Recruitment Strategist. 
+            Analyze the JD and categorize it into one of the following functional clusters:
+            engineering, management, data_science, marketing, sales, hr, finance, legal, customer_service.
+            Also define the scoring plan."""},
+            {"role": "user", "content": f"Analyze this JD:\n\n{text}"}
         ]
 
         response = self.client.chat.completions.create(
@@ -62,5 +60,4 @@ class JDAnalyzerAgent:
             temperature=0.0
         )
 
-        function_args = response.choices[0].message.function_call.arguments
-        return json.loads(function_args)
+        return json.loads(response.choices[0].message.function_call.arguments)

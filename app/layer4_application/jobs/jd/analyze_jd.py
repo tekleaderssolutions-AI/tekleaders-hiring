@@ -112,7 +112,9 @@ class AnalyzeJDUseCase:
             job_version = JobVersionModel(
                 id=job_version_id, job_id=actual_job_id, title=extracted_data.get("role"),
                 description=redacted_text, requirements_json=extracted_data, version=latest_version + 1,
-                embedding_model=self.embedding_model, embedding_version=self.embedding_version, is_active=True
+                embedding_model=self.embedding_model, embedding_version=self.embedding_version, 
+                scoring_weights=extracted_data.get("scoring_weights"), # Save dynamic weights
+                is_active=True
             )
             await self.job_repo.save_job_version(job_version, archive_others=True)
 
@@ -128,7 +130,8 @@ class AnalyzeJDUseCase:
                 vector = await self.embedder.generate_embedding(c_text)
                 memory = MemoryModel(
                     id=str(uuid.uuid4()), job_version_id=job_version_id, company_id=company_id,
-                    cluster=seniority.get("level"), entity_type="job_chunk",
+                    cluster=extracted_data.get("job_cluster", "other"),
+                    entity_type="job_chunk",
                     chunk_type=c_type, chunk_index=idx, text=c_text, embedding=vector,
                     embedding_model=self.embedding_model, embedding_version=self.embedding_version, is_active=True
                 )
