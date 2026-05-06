@@ -57,9 +57,11 @@ class FetchAndAlignUseCase:
             SELECT * FROM (
                 SELECT DISTINCT ON (r.id)
                     r.id as resume_id, r.candidate_id, r.skills_json, r.raw_text, r.metadata_json as resume_metadata,
+                    c.first_name, c.last_name, c.email,
                     (1 - (m.embedding <=> :jd_vector)) as best_similarity
                 FROM memories m
                 JOIN resumes r ON m.resume_id = r.id
+                JOIN candidates c ON r.candidate_id = c.id
                 WHERE m.entity_type = 'resume_chunk' AND m.company_id = :company_id
                   AND r.is_active = True AND m.is_active = True
                 ORDER BY r.id, best_similarity DESC
@@ -101,8 +103,13 @@ class FetchAndAlignUseCase:
             hybrid_score_100 = round(hybrid_score * 100, 2)
 
             matches.append({
-                "resume_id": cand["resume_id"], "candidate_id": cand["candidate_id"],
-                "raw_text": cand["raw_text"], "initial_score": hybrid_score_100,
+                "resume_id": cand["resume_id"], 
+                "candidate_id": cand["candidate_id"],
+                "first_name": cand["first_name"],
+                "last_name": cand["last_name"],
+                "email": cand["email"],
+                "raw_text": cand["raw_text"], 
+                "initial_score": hybrid_score_100,
                 "strategy_plan": weights # Show the recruiter the AI's weighting plan
             })
 
