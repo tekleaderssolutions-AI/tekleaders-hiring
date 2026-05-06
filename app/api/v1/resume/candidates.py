@@ -33,11 +33,18 @@ async def upload_resumes(
     
     # 1. Check if it's a Bulk ZIP -> Run in Background
     if filename.endswith(".zip"):
+        import zipfile
+        import io
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
+            total_count = len(filenames)
+            
         background_tasks.add_task(process_bulk_resumes, content, current_user.id)
         return {
             "mode": "bulk",
             "status": "processing",
-            "message": "Your resumes are being processed in the background. Check back in a few minutes."
+            "total_files": total_count,
+            "message": f"Processing {total_count} resumes in the background."
         }
     
     # 2. Otherwise process as a Single File
