@@ -2,10 +2,15 @@ from app.layer5_domain.entities.jd.job import Job
 from app.layer5_domain.repositories.jd.job_repository import JobRepository
 from app.schemas.jd.job_schemas import JobCreate
 from datetime import datetime
+from app.layer2_adapters.ai.embedding_service import EmbeddingService
+from app.layer6_data.models.memory_model import MemoryModel
+import uuid
 
 class CreateJobUseCase:
-    def __init__(self, job_repo: JobRepository):
+    def __init__(self, job_repo: JobRepository, db_session=None):
         self.job_repo = job_repo
+        self.db = db_session
+        self.embedder = EmbeddingService()
 
     async def execute(self, payload: JobCreate, company_id: str, user_id: str) -> Job:
         def get_val(v):
@@ -40,4 +45,41 @@ class CreateJobUseCase:
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        return await self.job_repo.create(new_job)
+        saved_job = await self.job_repo.create(new_job)
+
+        # ─── ELITE ADDITION: AUTO-EMBEDDING FOR SEARCH ───
+        if self.db:
+            # We need to find the job_version_id we just created
+            # The repo creates it, so we can fetch the latest active version
+            from app.layer6_data.models.jd.job_version_model import JobVersionModel
+            from sqlalchemy import select
+            res = await self.db.execute(
+                select(JobVersionModel.id)
+                .where(JobVersionModel.job_id == saved_job.id)
+                .where(JobVersionModel.is_active == True)
+            )
+            version_id = res.scalar_one_or_none()
+
+            if version_id:
+                # Generate embeddings for the JD summary
+                summary_text = f"Role: {saved_job.title}. Description: {saved_job.description}"
+                vector = await self.embedder.generate_embedding(summary_text)
+                
+                memory = MemoryModel(
+                    id=str(uuid.uuid4()),
+                    job_version_id=version_id,
+                    company_id=company_id,
+                    cluster="other", # Default cluster
+                    entity_type="job_chunk",
+                    chunk_type="job_summary",
+                    chunk_index=0,
+                    text=summary_text,
+                    embedding=vector,
+                    embedding_model="text-embedding-3-small",
+                    embedding_version="1.0",
+                    is_active=True
+                )
+                self.db.add(memory)
+                await self.db.flush()
+
+        return saved_job

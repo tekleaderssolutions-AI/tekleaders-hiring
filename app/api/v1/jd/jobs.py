@@ -76,7 +76,7 @@ async def create_job(
         # Transactions are managed by get_db dependency (session.begin())
 
     job_repo = PostgresJobRepository(db)
-    use_case = CreateJobUseCase(job_repo=job_repo)
+    use_case = CreateJobUseCase(job_repo=job_repo, db_session=db)
     
     try:
         job = await use_case.execute(payload, company_id=company_id, user_id=current_user.id)

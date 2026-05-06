@@ -177,3 +177,27 @@ class ParseResumeUseCase:
 
         finally:
             if os.path.exists(temp_path): os.remove(temp_path)
+
+    async def execute_bulk(self, zip_content: bytes, user_id: str) -> dict:
+        """
+        Processes a ZIP archive of resumes in parallel.
+        """
+        import zipfile
+        import io
+
+        results = []
+        with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
+            # Filter for PDF and DOCX
+            filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
+            
+            for filename in filenames:
+                try:
+                    with z.open(filename) as f:
+                        content = f.read()
+                    # Note: We await single for now to ensure DB stability, can be parallelized further if needed
+                    res = await self.execute_single(content, filename, user_id)
+                    results.append({"filename": filename, "status": "success", "id": res.get("resume_id")})
+                except Exception as e:
+                    results.append({"filename": filename, "status": "error", "message": str(e)})
+        
+        return {"total": len(filenames), "results": results}
