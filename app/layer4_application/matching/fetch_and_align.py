@@ -49,6 +49,9 @@ class FetchAndAlignUseCase:
         jd_embedding, jd_cluster = jd_memory
 
         # 4. Aggregated Vector Retrieval (Elite Pattern: DISTINCT ON to avoid JSON grouping errors)
+        # Convert jd_embedding (ndarray) to list for the SQL driver
+        jd_vector_list = jd_embedding.tolist() if hasattr(jd_embedding, "tolist") else jd_embedding
+
         vector_query = text("""
             SELECT * FROM (
                 SELECT DISTINCT ON (r.id)
@@ -63,7 +66,12 @@ class FetchAndAlignUseCase:
             ORDER BY best_similarity DESC LIMIT :limit
         """)
 
-        result_proxy = await self.db.execute(vector_query, {"jd_vector": jd_embedding, "company_id": company_id, "cluster": jd_cluster, "limit": top_k * 5})
+        result_proxy = await self.db.execute(vector_query, {
+            "jd_vector": jd_vector_list, 
+            "company_id": company_id, 
+            "cluster": jd_cluster, 
+            "limit": top_k * 5
+        })
         candidates = result_proxy.mappings().all()
 
         # 5. Apply AI-Driven Weights
