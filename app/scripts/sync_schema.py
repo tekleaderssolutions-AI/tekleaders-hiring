@@ -10,7 +10,7 @@ async def sync_schema():
     Designed for clean-slate deployments.
     """
     async with engine.begin() as conn:
-        print("🚀 Starting Elite System Initialization...")
+        print("Starting Elite System Initialization...")
         
         # 1. Enable Vector Extension (Critical for pgvector)
         try:

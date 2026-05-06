@@ -178,12 +178,14 @@ class ParseResumeUseCase:
         finally:
             if os.path.exists(temp_path): os.remove(temp_path)
 
-    async def execute_bulk(self, zip_content: bytes, user_id: str) -> List[dict]:
-        """Elite Bulk Processing: Parallel extraction with concurrency control"""
+    async def execute_bulk(self, zip_content: bytes, user_id: str, session_id: str = None) -> List[dict]:
+        """Elite Bulk Processing: Parallel extraction with concurrency control and lively updates"""
         import asyncio
         import zipfile
         import io
         from app.database import AsyncSessionLocal
+        from app.layer6_data.models.resume.bulk_upload_model import BulkUploadModel
+        from sqlalchemy import update
         
         results = []
         semaphore = asyncio.Semaphore(5) # Process 5 at a time
@@ -207,6 +209,16 @@ class ParseResumeUseCase:
                     if "error" in res:
                         return {"filename": filename, "status": "error", "message": res["error"]}
                     else:
+                        # ELITE UPDATE: Increment lively progress in DB
+                        if session_id:
+                            async with AsyncSessionLocal() as update_db:
+                                await update_db.execute(
+                                    update(BulkUploadModel)
+                                    .where(BulkUploadModel.id == session_id)
+                                    .values(processed_count=BulkUploadModel.processed_count + 1)
+                                )
+                                await update_db.commit()
+                        
                         return {"filename": filename, "status": "success", "id": res.get("resume_id")}
 
         with zipfile.ZipFile(io.BytesIO(zip_content)) as z:

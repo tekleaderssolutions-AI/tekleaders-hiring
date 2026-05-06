@@ -9,13 +9,25 @@ from app.layer6_data.repositories_impl.resume.postgres_candidate_repo import Pos
 
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
-async def process_bulk_resumes(content: bytes, user_id: str):
-    """Background task to process ZIP resumes with a fresh session"""
+async def process_bulk_resumes(content: bytes, user_id: str, session_id: str = None):
+    """Background task to process ZIP resumes with a fresh session and lively progress updates"""
     from app.database import AsyncSessionLocal
+    from app.layer6_data.models.resume.bulk_upload_model import BulkUploadModel
+    from sqlalchemy import update
+    
     async with AsyncSessionLocal() as db:
         use_case = ParseResumeUseCase(db)
-        await use_case.execute_bulk(content, user_id)
-        await db.commit()
+        results = await use_case.execute_bulk(content, user_id)
+        
+        # ELITE UPDATE: Mark the tracking session as completed
+        if session_id:
+            success_count = len([r for r in results if r["status"] == "success"])
+            await db.execute(
+                update(BulkUploadModel)
+                .where(BulkUploadModel.id == session_id)
+                .values(processed_count=success_count, status="completed")
+            )
+            await db.commit()
 
 @router.post(
     "/upload",
@@ -36,30 +48,44 @@ async def upload_resumes(
         import zipfile
         import io
         import hashlib
+        import uuid
+        from app.layer6_data.models.resume.bulk_upload_model import BulkUploadModel
         
         with zipfile.ZipFile(io.BytesIO(content)) as z:
             filenames = [f for f in z.namelist() if f.lower().endswith(('.pdf', '.docx')) and not f.startswith('__MACOSX')]
             total_count = len(filenames)
             
-            # Pre-scan for duplicates within the ZIP itself
+            # Pre-scan for duplicates
             seen_hashes = set()
             unique_count = 0
             duplicate_count = 0
-            
             for fname in filenames:
                 with z.open(fname) as f:
-                    f_content = f.read()
-                    f_hash = hashlib.md5(f_content).hexdigest()
+                    f_hash = hashlib.md5(f.read()).hexdigest()
                     if f_hash in seen_hashes:
                         duplicate_count += 1
                     else:
                         seen_hashes.add(f_hash)
                         unique_count += 1
-            
-        background_tasks.add_task(process_bulk_resumes, content, current_user.id)
+        
+        # Create Tracking Session
+        session_id = f"bulk_{str(uuid.uuid4())[:8]}"
+        async with AsyncSessionLocal() as session:
+            tracking = BulkUploadModel(
+                id=session_id,
+                user_id=current_user.id,
+                total_files=total_count,
+                unique_files=unique_count,
+                duplicate_files=duplicate_count,
+                status="processing"
+            )
+            session.add(tracking)
+            await session.commit()
+
+        background_tasks.add_task(process_bulk_resumes, content, current_user.id, session_id)
         return {
             "mode": "bulk",
-            "status": "processing",
+            "session_id": session_id,
             "total_files": total_count,
             "unique_files": unique_count,
             "duplicate_files": duplicate_count,
@@ -89,6 +115,35 @@ async def list_candidates(
     repo = PostgresCandidateRepository(db)
     candidates = await repo.list_candidates(limit=limit, offset=offset)
     return candidates
+
+@router.get(
+    "/progress/{session_id}",
+    summary="Get lively progress for a bulk upload session"
+)
+async def get_bulk_progress(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.layer6_data.models.resume.bulk_upload_model import BulkUploadModel
+    from sqlalchemy.future import select
+    
+    result = await db.execute(
+        select(BulkUploadModel).where(BulkUploadModel.id == session_id)
+    )
+    tracking = result.scalar_one_or_none()
+    
+    if not tracking:
+        raise HTTPException(status_code=404, detail="Bulk session not found")
+        
+    return {
+        "session_id": tracking.id,
+        "total": tracking.total_files,
+        "unique": tracking.unique_files,
+        "duplicates": tracking.duplicate_files,
+        "processed": tracking.processed_count,
+        "status": tracking.status
+    }
 
 @router.get(
     "/stats",
