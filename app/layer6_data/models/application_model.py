@@ -59,3 +59,4 @@ class ApplicationModel(Base):
     evaluations = relationship("CandidateEvaluationModel", back_populates="application", cascade="all, delete-orphan")
     feedback = relationship("ApplicationFeedbackModel", back_populates="application", uselist=False)
     interviews = relationship("InterviewModel", back_populates="application", cascade="all, delete-orphan")
+    ai_decisions = relationship("AIDecisionModel", back_populates="application", cascade="all, delete-orphan")
