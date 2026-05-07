@@ -85,6 +85,7 @@ class FetchAndAlignUseCase:
         for cand in candidates:
             # Skill Alignment
             cand_skills = set(cand["skills_json"] or [])
+            semantic_score = float(cand["best_similarity"])
             # ELITE OPTIMISTIC BOOST: 
             # Recruiter-friendly curve: even a 0.2 base similarity is often a "decent" fit in human terms.
             # We use an optimistic boost: boosted = (base^0.5) * 0.9 + 0.1
