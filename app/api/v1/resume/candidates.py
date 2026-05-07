@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status,
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
+from app.database import AsyncSessionLocal
 from app.dependencies import get_db, get_current_user
 from app.layer4_application.resume.parse_resume import ParseResumeUseCase
 from app.layer5_domain.entities.user import User
