@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
 import json
 import os
 from pathlib import Path
@@ -52,18 +51,15 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     S3_BUCKET_NAME: str = ""
 
-    # CORS — accepts JSON array or comma-separated string from env vars
-    ALLOWED_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
+    # CORS — set as comma-separated string in env: "https://app.com,http://localhost:5173"
+    ALLOWED_ORIGINS_STR: str = "http://localhost:3000,http://localhost:5173"
 
-    @field_validator("ALLOWED_ORIGINS", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v):
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("["):
-                return json.loads(v)
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+    @property
+    def ALLOWED_ORIGINS(self) -> list:
+        v = self.ALLOWED_ORIGINS_STR.strip()
+        if v.startswith("["):
+            return json.loads(v)
+        return [o.strip() for o in v.split(",") if o.strip()]
 
     model_config = SettingsConfigDict(
         env_file=_env_path,
