@@ -1,0 +1,12 @@
+/* ── Skeleton ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-bg-tertiary) 50%, var(--color-bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-md);
+}
+.skeleton-text { height:14px; margin-bottom:var(--spacing-2); }
+.skeleton-title { height:20px; width:60%; margin-bottom:var(--spacing-3); }
+.skeleton-avatar { width:40px; height:40px; border-radius:var(--radius-full); }
+.skeleton-card { height:200px; border-radius:var(--radius-xl); }
+.skeleton-row { height:48px; margin-bottom:var(--spacing-2); }

@@ -1,0 +1,13 @@
+/* ── Tabs ── */
+.tabs { display:flex; gap:var(--spacing-1); border-bottom:1px solid var(--color-border); padding:0 var(--spacing-2); }
+.tab {
+  padding:var(--spacing-3) var(--spacing-4); font-size:var(--text-sm); font-weight:var(--weight-medium);
+  color:var(--color-text-muted); border-bottom:2px solid transparent; cursor:pointer;
+  transition:all var(--transition); position:relative; bottom:-1px;
+}
+.tab:hover { color:var(--color-text); }
+.tab.active { color:var(--color-primary-light); border-bottom-color:var(--color-primary); }
+.tab-content { padding:var(--spacing-6) 0; }
+.tabs-pill { border-bottom:none; background:var(--color-bg-secondary); border-radius:var(--radius-lg); padding:var(--spacing-1); }
+.tabs-pill .tab { border-bottom:none; border-radius:var(--radius-md); }
+.tabs-pill .tab.active { background:var(--color-primary); color:#fff; }

@@ -1,0 +1,14 @@
+/* ── Toast ── */
+.toast-container { position:fixed; bottom:var(--spacing-6); right:var(--spacing-6); z-index:var(--z-toast); display:flex; flex-direction:column; gap:var(--spacing-3); }
+.toast {
+  display:flex; align-items:center; gap:var(--spacing-3); padding:var(--spacing-3) var(--spacing-4);
+  background:var(--color-elevated); border:1px solid var(--color-border); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg); min-width:320px; animation:slideUp 0.3s ease;
+}
+.toast-icon { width:20px; height:20px; flex-shrink:0; }
+.toast-message { flex:1; font-size:var(--text-sm); }
+.toast-close { color:var(--color-text-muted); cursor:pointer; padding:var(--spacing-1); }
+.toast-success { border-left:3px solid var(--color-success); }
+.toast-error { border-left:3px solid var(--color-danger); }
+.toast-warning { border-left:3px solid var(--color-warning); }
+.toast-info { border-left:3px solid var(--color-info); }

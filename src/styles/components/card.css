@@ -1,0 +1,49 @@
+/* ── Card Component ── */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-8); /* Generous padding */
+  box-shadow: var(--shadow-sm); /* Flat subtle shadow */
+  transition: all var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.card-flat {
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.card-flat:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.card-glass {
+  /* Retained class name for compatibility, but styled flat */
+  background: var(--color-bg-secondary);
+}
+
+.card-header {
+  padding-bottom: var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--spacing-4);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+}
+
+.card-description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-1);
+}

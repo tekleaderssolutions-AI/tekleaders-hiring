@@ -1,0 +1,18 @@
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; z-index: var(--z-modal);
+  animation: fadeIn 0.2s ease;
+}
+.modal {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl); padding: var(--spacing-8);
+  max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto;
+  box-shadow: var(--shadow-xl); animation: scaleIn 0.25s ease;
+}
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--spacing-6); }
+.modal-title { font-family:var(--font-display); font-size:var(--text-xl); font-weight:var(--weight-bold); }
+.modal-close { width:32px;height:32px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--color-text-muted);transition:all var(--transition); }
+.modal-close:hover { background:var(--glass-bg-light); color:var(--color-text); }
+.modal-body { margin-bottom: var(--spacing-6); }
+.modal-footer { display:flex; justify-content:flex-end; gap:var(--spacing-3); padding-top:var(--spacing-4); border-top:1px solid var(--color-border); }
