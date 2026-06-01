@@ -58,13 +58,18 @@ async def sync_schema():
             "CREATE INDEX IF NOT EXISTS idx_memories_resume_id ON memories(resume_id)",
             "CREATE INDEX IF NOT EXISTS idx_candidate_submissions_job_id ON candidate_submissions(job_id)",
             "CREATE INDEX IF NOT EXISTS idx_candidate_submissions_candidate_id ON candidate_submissions(candidate_id)",
-            "CREATE INDEX IF NOT EXISTS idx_jd_assignments_user_id ON jd_assignments(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jd_assignments_employee_id ON jd_assignments(employee_id)",
             "CREATE INDEX IF NOT EXISTS idx_jd_assignments_job_id ON jd_assignments(job_id)",
         ]
         for patch in _patches:
             try:
+                # Each patch runs in its own savepoint so a failure
+                # doesn't abort the whole transaction
+                await conn.execute(text("SAVEPOINT patch_sp"))
                 await conn.execute(text(patch))
+                await conn.execute(text("RELEASE SAVEPOINT patch_sp"))
             except Exception as e:
+                await conn.execute(text("ROLLBACK TO SAVEPOINT patch_sp"))
                 print(f"  [WARN] Patch skipped ({e})")
         print("  [OK] Schema patches applied.")
 
