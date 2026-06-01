@@ -7,8 +7,12 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
+try:
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+except ImportError:
+    Credentials = None
+    build = None
 from pydantic import BaseModel
 
 from app.dependencies import get_db, get_current_user
