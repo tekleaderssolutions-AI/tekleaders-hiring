@@ -23,6 +23,9 @@ class ResumeModel(Base):
     content_hash = Column(String, index=True)      # SHA-256 for deduplication
     is_active = Column(Boolean, default=True, index=True) # For version lifecycle
     
+    # Who uploaded this resume
+    uploaded_by = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+
     # Embedding Metadata (Priority 2)
     embedding_model = Column(String, nullable=True)
     embedding_version = Column(String, nullable=True)

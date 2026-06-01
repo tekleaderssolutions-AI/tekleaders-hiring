@@ -10,6 +10,8 @@ from app.layer6_data.repositories_impl.postgres_user_repo import PostgresUserRep
 from app.layer2_adapters.auth.google_auth_adapter import GoogleAuthAdapter
 from app.layer5_domain.entities.user import User
 
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         async with session.begin():
@@ -56,3 +58,21 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise credentials_exception
     return user
+
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
+
+
+async def require_admin_or_recruiter(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role not in ("admin", "recruiter"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or recruiter access required",
+        )
+    return current_user

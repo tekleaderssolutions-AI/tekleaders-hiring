@@ -1,9 +1,9 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.config import settings
 
 class EmbeddingService:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.EMBEDDING_MODEL
 
     from app.layer7_crosscutting.ai.resilience import ai_retry
@@ -16,7 +16,7 @@ class EmbeddingService:
         import asyncio
         # Run in threadpool if it's the sync client, or just use it if it's the async client
         # For now, let's keep it simple as it was, but with the decorator
-        response = self.client.embeddings.create(
+        response = await self.client.embeddings.create(
             input=[text],
             model=self.model
         )

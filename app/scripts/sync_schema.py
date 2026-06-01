@@ -2,6 +2,7 @@ import asyncio
 from sqlalchemy import text
 from app.database import engine
 from app.layer6_data.models import Base
+from app.config import settings
 
 async def sync_schema():
     """
@@ -11,7 +12,7 @@ async def sync_schema():
     """
     async with engine.begin() as conn:
         print("Starting Elite System Initialization...")
-        
+
         # 1. Enable Vector Extension (Critical for pgvector)
         try:
             print("- Enabling 'vector' extension...")
@@ -24,14 +25,101 @@ async def sync_schema():
         # 2. Create All Tables from Registry
         try:
             print("- Synchronizing ORM Models with Database...")
-            # Note: run_sync is used to bridge async SQLAlchemy with sync Base.metadata
             await conn.run_sync(Base.metadata.create_all)
             print("  [OK] All tables (Candidates, Resumes, Jobs, Versions, Memory, etc.) verified.")
         except Exception as e:
             print(f"  [ERROR] Schema synchronization failed: {e}")
             raise e
 
-        print("\n✅ System Initialization Complete! Ready for AI Ingestion.")
+        # 3. Incremental column additions for existing tables (ALTER TABLE safe)
+        print("- Applying incremental schema patches...")
+        _patches = [
+            # Jobs table: recruitment tracking columns
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_id VARCHAR REFERENCES clients(id)",
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS priority VARCHAR DEFAULT 'medium'",
+            "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS target_count INTEGER DEFAULT 1",
+            # Convert status/priority columns from native PostgreSQL ENUM to plain VARCHAR.
+            # ::text cast works on any enum type regardless of values.
+            "ALTER TABLE jobs ALTER COLUMN status TYPE VARCHAR USING status::text",
+            "ALTER TABLE jobs ALTER COLUMN priority TYPE VARCHAR USING priority::text",
+            "ALTER TABLE users ALTER COLUMN role TYPE VARCHAR USING role::text",
+            "UPDATE users SET role = LOWER(role) WHERE role != LOWER(role)",
+            # Resumes table: track which user uploaded each resume
+            "ALTER TABLE resumes ADD COLUMN IF NOT EXISTS uploaded_by VARCHAR REFERENCES users(id)",
+            # Interview invitations: link to job and recruiter for shortlisted tracking
+            "ALTER TABLE interview_invitations ADD COLUMN IF NOT EXISTS job_id VARCHAR",
+            "ALTER TABLE interview_invitations ADD COLUMN IF NOT EXISTS recruiter_id VARCHAR",
+            # Performance indexes — critical for sub-200ms queries
+            "CREATE INDEX IF NOT EXISTS idx_jobs_company_id ON jobs(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_resumes_candidate_id ON resumes(candidate_id)",
+            "CREATE INDEX IF NOT EXISTS idx_resumes_is_active ON resumes(is_active) WHERE is_active = TRUE",
+            "CREATE INDEX IF NOT EXISTS idx_memories_company_id ON memories(company_id)",
+            "CREATE INDEX IF NOT EXISTS idx_memories_resume_id ON memories(resume_id)",
+            "CREATE INDEX IF NOT EXISTS idx_candidate_submissions_job_id ON candidate_submissions(job_id)",
+            "CREATE INDEX IF NOT EXISTS idx_candidate_submissions_candidate_id ON candidate_submissions(candidate_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jd_assignments_user_id ON jd_assignments(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jd_assignments_job_id ON jd_assignments(job_id)",
+        ]
+        for patch in _patches:
+            try:
+                await conn.execute(text(patch))
+            except Exception as e:
+                print(f"  [WARN] Patch skipped ({e})")
+        print("  [OK] Schema patches applied.")
+
+        # 4. Bootstrap first admin — create or update
+        if settings.FIRST_ADMIN_EMAIL and settings.FIRST_ADMIN_PASSWORD:
+            try:
+                import uuid as _uuid
+                from app.layer7_crosscutting.security import PasswordHasher
+                hashed = PasswordHasher.hash(settings.FIRST_ADMIN_PASSWORD)
+
+                # Check if user already exists
+                existing = await conn.execute(
+                    text("SELECT id, company_id FROM users WHERE email = :email"),
+                    {"email": settings.FIRST_ADMIN_EMAIL},
+                )
+                row = existing.fetchone()
+
+                if row:
+                    # User exists — just update role and password
+                    await conn.execute(
+                        text("UPDATE users SET role = 'admin', hashed_password = :pw WHERE email = :email"),
+                        {"pw": hashed, "email": settings.FIRST_ADMIN_EMAIL},
+                    )
+                    print(f"  [OK] Admin updated: {settings.FIRST_ADMIN_EMAIL} — role=admin, password reset.")
+                else:
+                    # User doesn't exist — get or create a company first, then create user
+                    company_row = await conn.execute(text("SELECT id FROM companies LIMIT 1"))
+                    existing_company = company_row.fetchone()
+
+                    if existing_company:
+                        company_id = existing_company[0]
+                    else:
+                        company_id = str(_uuid.uuid4())
+                        await conn.execute(
+                            text("INSERT INTO companies (id, name) VALUES (:id, :name)"),
+                            {"id": company_id, "name": "Hirix Company"},
+                        )
+
+                    user_id = str(_uuid.uuid4())
+                    await conn.execute(
+                        text("""
+                            INSERT INTO users (id, email, hashed_password, first_name, last_name, role, company_id, is_active)
+                            VALUES (:id, :email, :pw, 'Admin', 'User', 'admin', :cid, true)
+                            ON CONFLICT (email) DO UPDATE SET role='admin', hashed_password=EXCLUDED.hashed_password
+                        """),
+                        {"id": user_id, "email": settings.FIRST_ADMIN_EMAIL, "pw": hashed, "cid": company_id},
+                    )
+                    print(f"  [OK] Admin created: {settings.FIRST_ADMIN_EMAIL}")
+
+                print(f"  [WARN] Remove FIRST_ADMIN_PASSWORD from .env after first login.")
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                print(f"  [WARN] Could not bootstrap admin: {e}")
+
+        print("\n[OK] System Initialization Complete! Ready for AI Ingestion.")
 
 if __name__ == "__main__":
     asyncio.run(sync_schema())

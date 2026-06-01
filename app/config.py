@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/hirix"
+    DATABASE_SSL: bool = False  # Set True for Neon / any cloud PostgreSQL
 
     @property
     def async_database_url(self) -> str:
@@ -28,13 +29,28 @@ class Settings(BaseSettings):
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/gmail/callback"
+    GOOGLE_REFRESH_TOKEN: str = ""
+    GOOGLE_SENDER_EMAIL: str = ""
 
     # OpenAI / LLM
     OPENAI_API_KEY: str = ""
     LLM_MODEL: str = "gpt-4o-mini"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
-    # CORS
+    # Bootstrap admin — set to your email to promote that user to admin on startup
+    FIRST_ADMIN_EMAIL: str = ""
+    # Optionally reset the admin password on startup (clear after use)
+    FIRST_ADMIN_PASSWORD: str = ""
+
+    # AWS S3 (optional — for resume file storage)
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "us-east-1"
+    S3_BUCKET_NAME: str = ""
+
+    # CORS — add your Amplify URL here after deploy
     ALLOWED_ORIGINS: list = ["http://localhost:3000", "http://localhost:5173"]
 
     model_config = SettingsConfigDict(

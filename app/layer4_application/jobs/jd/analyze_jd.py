@@ -1,3 +1,4 @@
+import re
 import uuid
 import time
 import hashlib
@@ -12,6 +13,21 @@ from app.layer4_application.jobs.jd.enrich_jd import JDEnricher
 from app.layer7_crosscutting.jd.skill_ontology import SkillOntology
 from app.layer7_crosscutting.resume.seniority_enricher import SeniorityEnricher
 from app.layer2_adapters.ai.embedding_service import EmbeddingService
+
+
+def _skill_in_jd_text(skill: str, text_lower: str) -> bool:
+    """
+    Verify a skill (or any of its aliases) literally appears in the JD text.
+    Prevents LLM from keeping inferred skills not written in the JD.
+    """
+    candidates = {skill}
+    for alias, canon in SkillOntology.ALIASES.items():
+        if canon == skill and len(alias) >= 2:
+            candidates.add(alias)
+    for s in candidates:
+        if re.search(r'\b' + re.escape(s) + r'\b', text_lower):
+            return True
+    return False
 
 # Models
 from app.layer6_data.models.memory_model import MemoryModel
@@ -66,11 +82,10 @@ class AnalyzeJDUseCase:
             content_hash = self.calculate_content_hash(raw_text)
             # (Optional: check if latest version hash matches to avoid redundant work)
 
-            # 4 & 5. Preprocessing & Redaction
+            # 4. Preprocessing (no PII redaction — JDs are company documents, not personal data)
             t0 = time.time()
             clean_text = TextProcessor.clean_text(raw_text)
-            redacted_text, pii_flag, redactions = TextProcessor.redact_pii(clean_text)
-            await self._log_step(run_id, "preprocessing_pii", start_time=t0)
+            await self._log_step(run_id, "preprocessing", start_time=t0)
 
             # 7. LLM Extraction (Priority 2: Retries included in service)
             t0 = time.time()
@@ -79,9 +94,27 @@ class AnalyzeJDUseCase:
 
             # 9-14. Normalization & Ontology
             extracted_data["experience"] = JDNormalizer.normalize_experience(extracted_data.get("experience"))
-            primary_raw = [{"name": s, "importance": "must-have"} for s in (extracted_data.get("primary_skills") or [])]
-            enriched_primary = SkillOntology.normalize_skills(primary_raw)
-            canonical_skills = [s["name"] for s in enriched_primary]
+
+            # Support both new schema (must_have_skills) and legacy (primary_skills)
+            must_have_raw   = extracted_data.get("must_have_skills") or extracted_data.get("primary_skills") or []
+            nice_to_have_raw = extracted_data.get("nice_to_have_skills") or []
+
+            enriched_must   = SkillOntology.normalize_skills([{"name": s, "importance": "must-have"} for s in must_have_raw])
+            enriched_nice   = SkillOntology.normalize_skills([{"name": s, "importance": "preferred"} for s in nice_to_have_raw])
+
+            canonical_must_have    = [s["name"] for s in enriched_must]
+            canonical_nice_to_have = [s["name"] for s in enriched_nice]
+
+            # Post-LLM validation: drop any skill not literally present in the JD text.
+            # Prevents the LLM from inferring skills never written in the document.
+            jd_text_lower = clean_text.lower()
+            canonical_must_have    = [s for s in canonical_must_have    if _skill_in_jd_text(s, jd_text_lower)]
+            canonical_nice_to_have = [s for s in canonical_nice_to_have if _skill_in_jd_text(s, jd_text_lower)]
+
+            # Persist normalized + validated skill lists back into requirements_json
+            extracted_data["must_have_skills"]   = canonical_must_have
+            extracted_data["nice_to_have_skills"] = canonical_nice_to_have
+            extracted_data["primary_skills"]      = canonical_must_have  # legacy fallback
 
             # 16. Seniority
             seniority = SeniorityEnricher.detect_seniority(
@@ -101,7 +134,7 @@ class AnalyzeJDUseCase:
                 from app.layer5_domain.entities.jd.job import Job
                 job_entity = Job(
                     title=extracted_data.get("role") or "Untitled Job",
-                    description=redacted_text,
+                    description=clean_text,
                     employment_type=extracted_data.get("employment_type"),
                     experience_level=extracted_data.get("experience_level"),
                     company_id=company_id,
@@ -125,7 +158,7 @@ class AnalyzeJDUseCase:
             job_version_id = str(uuid.uuid4())
             job_version = JobVersionModel(
                 id=job_version_id, job_id=actual_job_id, title=extracted_data.get("role"),
-                description=redacted_text, requirements_json=extracted_data, version=latest_version + 1,
+                description=clean_text, requirements_json=extracted_data, version=latest_version + 1,
                 embedding_model=self.embedding_model, embedding_version=self.embedding_version, 
                 scoring_weights=extracted_data.get("scoring_weights"), # Save dynamic weights
                 is_active=True
@@ -135,9 +168,9 @@ class AnalyzeJDUseCase:
             # Granular Chunked Embeddings
             t0 = time.time()
             chunks = [
-                ("job_summary", f"Role: {extracted_data.get('role')}. Seniority: {seniority.get('level')}. Summary: {extracted_data.get('summary')}"),
-                ("mandatory_skills", f"Mandatory Skills: {', '.join(canonical_skills)}"),
-                ("responsibilities", f"Responsibilities: {'; '.join(extracted_data.get('responsibilities') or [])}")
+                ("job_summary",      f"Role: {extracted_data.get('role')}. Seniority: {seniority.get('level')}. Summary: {extracted_data.get('summary')}"),
+                ("mandatory_skills", f"Must-Have Skills: {', '.join(canonical_must_have)}. Preferred: {', '.join(canonical_nice_to_have)}"),
+                ("responsibilities", f"Responsibilities: {'; '.join(extracted_data.get('responsibilities') or [])}"),
             ]
 
             for idx, (c_type, c_text) in enumerate(chunks):
@@ -159,6 +192,13 @@ class AnalyzeJDUseCase:
             return {"job_id": actual_job_id, "version": job_version.version, "status": "success"}
 
         except Exception as e:
-            agent_run.status = "failed"
-            await self._log_step(run_id, "error", status="failed", output_data={"error": str(e)})
+            # Rollback the aborted transaction before attempting any writes
+            try:
+                await self.db.rollback()
+                agent_run.status = "failed"
+                agent_run.completed_at = datetime.now()
+                await self.db.flush()
+                await self.db.commit()
+            except Exception:
+                pass
             raise e

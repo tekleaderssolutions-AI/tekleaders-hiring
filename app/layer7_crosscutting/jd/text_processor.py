@@ -25,43 +25,93 @@ class TextProcessor:
         return text
 
     @staticmethod
-    def redact_pii(text: str) -> tuple[str, bool, list[str]]:
+    def extract_contact_info(text: str) -> dict:
         """
-        Backend ONLY: Step 4 - PII Redaction (MANDATORY)
-        Detect and remove: emails, phone numbers, URLs
-        Returns: (clean_text, pii_flag, redactions_found)
+        Step 1 - Extract name, email, phone via regex from raw text BEFORE any redaction or LLM call.
+        This ensures PII never reaches the LLM.
+        """
+        # Email
+        email = None
+        email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text)
+        if email_match:
+            email = email_match.group()
+
+        # Phone (first match with 10+ digits)
+        phone = None
+        phone_pattern = r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}'
+        for match in re.finditer(phone_pattern, text):
+            if len(re.sub(r'\D', '', match.group())) >= 10:
+                phone = match.group().strip()
+                break
+
+        # Name: heuristic — first short line (2-4 words) near the top that looks like a name
+        name = None
+        lines = [l.strip() for l in text.split('\n') if l.strip()]
+        for line in lines[:8]:
+            words = line.split()
+            if (2 <= len(words) <= 4
+                    and not any(c.isdigit() for c in line)
+                    and '@' not in line
+                    and not re.search(r'(resume|curriculum|vitae|\bcv\b|profile|objective|summary|address)', line.lower())):
+                name = line
+                break
+
+        # LinkedIn URL — try full URL first, then bare domain path
+        linkedin_url = None
+        li_match = re.search(r'https?://(?:www\.)?linkedin\.com/in/[^\s,;>\'"]+', text, re.IGNORECASE)
+        if not li_match:
+            li_match = re.search(r'(?:www\.)?linkedin\.com/in/[^\s,;>\'"]+', text, re.IGNORECASE)
+        if li_match:
+            url = li_match.group().rstrip('.')
+            if not url.startswith('http'):
+                url = 'https://' + url
+            linkedin_url = url
+
+        return {"name": name, "email": email, "phone": phone, "linkedin_url": linkedin_url}
+
+    @staticmethod
+    def redact_pii(text: str, name: str = None) -> tuple[str, bool, list[str]]:
+        """
+        Step 2 - PII Redaction. Always call AFTER extract_contact_info.
+        Strips: name (if provided), emails, phone numbers, URLs.
+        Returns: (redacted_text, pii_flag, redactions_found)
         """
         redactions = []
         pii_flag = False
-        
-        # Email Regex
+
+        # Redact candidate name first (word-boundary safe)
+        if name:
+            name_pattern = re.escape(name.strip())
+            if re.search(name_pattern, text, re.IGNORECASE):
+                text = re.sub(name_pattern, "[NAME_REDACTED]", text, flags=re.IGNORECASE)
+                redactions.append("name")
+                pii_flag = True
+
+        # Email
         email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
         if re.search(email_pattern, text):
             text = re.sub(email_pattern, "[EMAIL_REDACTED]", text)
             redactions.append("email")
             pii_flag = True
-            
-        # Phone Number Regex (Supports various formats)
+
+        # Phone numbers (10+ digits)
         phone_pattern = r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}'
-        # This regex is broad, might catch some numbers that aren't phones, 
-        # but better safe for redaction.
         if re.search(phone_pattern, text):
-            # Only redact if length is reasonable for a phone
-            matches = re.finditer(phone_pattern, text)
+            matches = list(re.finditer(phone_pattern, text))
             for match in matches:
                 if len(re.sub(r'\D', '', match.group())) >= 10:
                     text = text.replace(match.group(), "[PHONE_REDACTED]")
                     if "phone" not in redactions:
                         redactions.append("phone")
                     pii_flag = True
-        
-        # URL Regex
+
+        # URLs
         url_pattern = r'https?://[^\s<>"]+|www\.[^\s<>"]+'
         if re.search(url_pattern, text):
             text = re.sub(url_pattern, "[URL_REDACTED]", text)
             redactions.append("url")
             pii_flag = True
-            
+
         return text, pii_flag, redactions
 
     @staticmethod

@@ -5,6 +5,7 @@ class UserSignUp(BaseModel):
     email: EmailStr
     first_name: str = Field(..., min_length=1)
     last_name: str = Field(..., min_length=1)
+    company_name: Optional[str] = None
     password: str = Field(..., min_length=8)
     re_password: str = Field(..., min_length=8)
 
@@ -31,6 +32,9 @@ class UserRead(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
+    role: Optional[str] = None
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
     is_active: bool = True
 
     class Config:

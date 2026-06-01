@@ -25,22 +25,27 @@ class JobCreate(BaseModel):
     title: str = Field(..., max_length=80)
     job_code: Optional[str] = None
     department: Optional[str] = None
-    
+
+    # Client & recruitment tracking
+    client_id: Optional[str] = None
+    priority: Optional[str] = "medium"
+    target_count: Optional[int] = 1
+
     workplace_type: Any = WorkplaceType.ON_SITE
     location: Optional[str] = None
-    
+
     description: str = Field(..., min_length=10)
     requirements: Optional[str] = None
     benefits: Optional[str] = None
-    
+
     industry: Any = None
     job_function: Any = None
-    
+
     employment_type: Any
     experience_level: Any
     education_level: Any = None
     keywords: Optional[List[str] | str] = []
-    
+
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
     salary_currency: Optional[str] = "INR"

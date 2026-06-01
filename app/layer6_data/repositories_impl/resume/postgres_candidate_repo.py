@@ -13,29 +13,41 @@ class PostgresCandidateRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_or_create_candidate(self, email: str, first_name: str = None, last_name: str = None, phone: str = None) -> CandidateModel:
+    async def get_or_create_candidate(
+        self, email: str,
+        first_name: str = None, last_name: str = None,
+        phone: str = None, linkedin_url: str = None
+    ) -> CandidateModel:
         """
         Ensures a global identity exists for the given email.
+        Uses ON CONFLICT DO NOTHING to safely handle concurrent bulk uploads.
         """
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        if not email:
+            raise ValueError("Resume must contain a valid email address — cannot create candidate identity without one.")
+
+        email = email.lower()
+        candidate_id = hashlib.md5(email.encode()).hexdigest()[:12]
+
+        stmt = (
+            pg_insert(CandidateModel)
+            .values(id=candidate_id, email=email, first_name=first_name, last_name=last_name,
+                    phone=phone, linkedin_url=linkedin_url)
+            .on_conflict_do_nothing(index_elements=["id"])
+        )
+        await self.session.execute(stmt)
+        await self.session.flush()
+
         result = await self.session.execute(select(CandidateModel).where(CandidateModel.email == email))
         candidate = result.scalar_one_or_none()
-        
-        if not candidate:
-            candidate = CandidateModel(
-                id=str(hashlib.md5(email.lower().encode()).hexdigest()[:12]), # Stable ID based on email
-                email=email.lower(),
-                first_name=first_name,
-                last_name=last_name,
-                phone=phone
-            )
-            self.session.add(candidate)
-            await self.session.flush()
-        else:
-            # Update info if provided and missing
-            if first_name: candidate.first_name = first_name
-            if last_name: candidate.last_name = last_name
-            if phone: candidate.phone = phone
-            
+
+        if candidate:
+            if first_name and not candidate.first_name:    candidate.first_name = first_name
+            if last_name  and not candidate.last_name:     candidate.last_name  = last_name
+            if phone      and not candidate.phone:          candidate.phone      = phone
+            if linkedin_url and not candidate.linkedin_url: candidate.linkedin_url = linkedin_url
+
         return candidate
 
     async def get_resume_by_hash(self, content_hash: str) -> Optional[ResumeModel]:

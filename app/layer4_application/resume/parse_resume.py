@@ -71,13 +71,20 @@ class ParseResumeUseCase:
         return output_data
 
     async def execute_single(self, file_content: bytes, filename: str, user_id: str) -> dict:
-        # 1. Initial Load & Hash
-        temp_path = f"temp_{uuid.uuid4()}_{os.path.basename(filename)}"
-        with open(temp_path, "wb") as f: f.write(file_content)
+        # 1. Initial Load & Hash — use system temp dir so files never leak into repo
+        import tempfile
+        suffix = os.path.splitext(filename)[1]
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp.write(file_content)
+        tmp.close()
+        temp_path = tmp.name
         
         try:
-            if filename.lower().endswith(".pdf"): raw_text = PDFParser.extract_text(temp_path)
-            else: raw_text = DocxParser.extract_text(temp_path)
+            if filename.lower().endswith(".pdf"):
+                from app.config import settings
+                raw_text = await PDFParser.extract_text_async(temp_path, api_key=settings.OPENAI_API_KEY)
+            else:
+                raw_text = DocxParser.extract_text(temp_path)
             
             content_hash = self.calculate_content_hash(raw_text)
             
@@ -93,69 +100,105 @@ class ParseResumeUseCase:
                 await self.db.flush()
 
             # ── 17-STAGE PIPELINE WITH CHECKPOINTS ───────────────────────────
-            
-            # Stage 4-5: Preprocessing
+
+            # Stage 1: Regex contact extraction — BEFORE redaction or LLM
+            # Name, email, phone are captured here so they never reach OpenAI.
+            async def run_contact_extraction():
+                return TextProcessor.extract_contact_info(raw_text)
+
+            contact_data = await self._get_or_run_step(run_id, "contact_extraction", run_contact_extraction)
+
+            # Stage 2: Clean + Redact (strips name, email, phone, URLs from text)
             async def run_prep():
                 clean = TextProcessor.clean_text(raw_text)
-                redacted, pii, red_map = TextProcessor.redact_pii(clean)
-                return {"clean_text": clean, "redacted_text": redacted, "pii": pii}
-            
+                redacted, pii, red_map = TextProcessor.redact_pii(clean, name=contact_data.get("name"))
+                return {"redacted_text": redacted, "pii": pii}
+
             prep_data = await self._get_or_run_step(run_id, "preprocessing", run_prep)
 
-            # Stage 7: LLM Extraction
+            # Stage 3: LLM receives REDACTED text — extracts only professional info
             async def run_extraction():
-                return await self.analyzer.analyze(prep_data["clean_text"])
-            
+                return await self.analyzer.analyze(prep_data["redacted_text"])
+
             extracted_data = await self._get_or_run_step(run_id, "llm_extraction", run_extraction)
 
             # Stage 10-13: Ontology & Seniority
             async def run_enrichment():
                 enriched = SkillOntology.normalize_skills_from_list(extracted_data.get("skills") or [])
+                total_yrs = float(extracted_data.get("total_experience_years") or 0)
                 seniority = SeniorityEnricher.detect_seniority(
                     current_title=extracted_data.get("current_title", ""),
-                    total_years=float(extracted_data.get("total_experience_years") or 0),
+                    total_years=total_yrs,
                     work_experience=extracted_data.get("work_experience") or []
                 )
+                seniority["total_years"] = total_yrs  # persist so fetch_and_align can read it
                 return {"skills": [s["name"] for s in enriched], "seniority": seniority}
-            
+
             enrichment_data = await self._get_or_run_step(run_id, "enrichment", run_enrichment)
 
-            # Stage 14: Persistence (Identity + Version)
+            # Stage 14: Persistence — contact fields come from regex, professional from LLM
             async def run_persistence():
-                full_name = (extracted_data.get("candidate_name") or "Unknown").split(" ", 1)
+                name = contact_data.get("name") or "Unknown"
+                full_name = name.split(" ", 1)
                 candidate = await self.repo.get_or_create_candidate(
-                    email=extracted_data.get("email"),
-                    first_name=full_name[0], last_name=full_name[1] if len(full_name) > 1 else ""
+                    email=contact_data.get("email"),
+                    first_name=full_name[0], last_name=full_name[1] if len(full_name) > 1 else "",
+                    phone=contact_data.get("phone"),
+                    linkedin_url=contact_data.get("linkedin_url"),
                 )
                 
                 resume_id = str(uuid.uuid4())
                 resume_data = {
                     "id": resume_id, "candidate_id": candidate.id,
-                    "title": extracted_data.get("current_title"), "raw_text": prep_data["redacted_text"],
+                    "title": extracted_data.get("current_title"), "raw_text": prep_data["redacted_text"],  # PII-free
                     "content_hash": content_hash, "skills_json": enrichment_data["skills"],
                     "experience_json": extracted_data.get("work_experience"),
-                    "metadata_json": {"seniority": enrichment_data["seniority"]}
+                    "metadata_json": {"seniority": enrichment_data["seniority"]},
+                    "uploaded_by": user_id,
                 }
                 await self.repo.save_resume(resume_data)
                 return {"resume_id": resume_id, "candidate_id": candidate.id}
             
-            persistence_data = await self._get_or_run_step(run_id, "persistence", run_persistence)
+            # Persistence is NOT cached via checkpoint — always verify the resume still exists.
+            # If DB was cleared, cached resume_id would be stale and nothing would be written.
+            from sqlalchemy import select as _select
+            from app.layer6_data.models.resume.resume_model import ResumeModel as _ResumeModel
+            _cached = await self.db.execute(
+                _select(AgentStepModel)
+                .where(AgentStepModel.run_id == run_id)
+                .where(AgentStepModel.step_name == "persistence")
+                .where(AgentStepModel.status == "completed")
+                .limit(1)
+            )
+            _cached_step = _cached.scalar_one_or_none()
+            _resume_exists = False
+            if _cached_step and isinstance(_cached_step.output_data, dict):
+                _rid = _cached_step.output_data.get("resume_id")
+                if _rid:
+                    _r = await self.db.execute(_select(_ResumeModel).where(_ResumeModel.id == _rid))
+                    _resume_exists = _r.scalar_one_or_none() is not None
+            if _resume_exists:
+                persistence_data = _cached_step.output_data
+            else:
+                persistence_data = await self._get_or_run_step(run_id, "persistence", run_persistence)
 
             # Stage 15-17: Granular Memory & Vector Isolation
             async def run_memory():
+                import asyncio as _asyncio
                 cluster = extracted_data.get("job_cluster", "other")
                 res = await self.db.execute(select(UserModel).where(UserModel.id == user_id))
                 user_model = res.scalar_one_or_none()
                 company_id = user_model.company_id if user_model else None
 
-                # Create granular chunks for best-similarity matching
                 chunks = [
                     ("resume_summary", f"Role: {extracted_data.get('current_title')}. Summary: {extracted_data.get('summary')}"),
                     ("resume_skills", f"Skills: {', '.join(enrichment_data['skills'])}"),
                 ]
-                
-                for idx, (c_type, c_text) in enumerate(chunks):
-                    vector = await self.embedder.generate_embedding(c_text)
+
+                # Generate all embeddings in parallel instead of sequentially
+                vectors = await _asyncio.gather(*[self.embedder.generate_embedding(text) for _, text in chunks])
+
+                for idx, ((c_type, c_text), vector) in enumerate(zip(chunks, vectors)):
                     memory = MemoryModel(
                         id=str(uuid.uuid4()), resume_id=persistence_data["resume_id"], company_id=company_id,
                         cluster=cluster, entity_type="resume_chunk", chunk_type=c_type,
@@ -188,28 +231,16 @@ class ParseResumeUseCase:
         from sqlalchemy import update
         
         results = []
-        semaphore = asyncio.Semaphore(5) # Process 5 at a time
+        semaphore = asyncio.Semaphore(8)  # 8 concurrent files
 
         async def process_file(filename, content):
             async with semaphore:
-                async with AsyncSessionLocal() as db:
-                    # Create a temporary use-case with its own session for thread-safety
-                    temp_use_case = ParseResumeUseCase(db)
-                    
-                    max_retries = 2
-                    res = {"error": "Initial state"}
-                    for attempt in range(max_retries):
-                        try:
+                last_error = "Unknown error"
+                for attempt in range(2):
+                    try:
+                        async with AsyncSessionLocal() as db:
+                            temp_use_case = ParseResumeUseCase(db)
                             res = await temp_use_case.execute_single(content, filename, user_id)
-                            if "error" not in res:
-                                break
-                        except Exception as e:
-                            print(f"Attempt {attempt+1} failed for {filename}: {e}")
-                    
-                    if "error" in res:
-                        return {"filename": filename, "status": "error", "message": res["error"]}
-                    else:
-                        # ELITE UPDATE: Increment lively progress in DB
                         if session_id:
                             async with AsyncSessionLocal() as update_db:
                                 await update_db.execute(
@@ -218,8 +249,11 @@ class ParseResumeUseCase:
                                     .values(processed_count=BulkUploadModel.processed_count + 1)
                                 )
                                 await update_db.commit()
-                        
                         return {"filename": filename, "status": "success", "id": res.get("resume_id")}
+                    except Exception as e:
+                        last_error = str(e)
+                        print(f"Attempt {attempt+1} failed for {filename}: {e}")
+                return {"filename": filename, "status": "error", "message": last_error}
 
         with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
             # Filter for PDF and DOCX

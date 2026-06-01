@@ -7,6 +7,12 @@ from app.api.v1.jd.jobs import router as jobs_router
 from app.api.v1.resume.candidates import router as candidates_router
 from app.api.v1.matching import router as matching_router
 from app.api.v1.feedback import router as feedback_router
+from app.api.v1.clients import router as clients_router
+from app.api.v1.submissions import router as submissions_router
+from app.api.v1.admin import router as admin_router
+from app.api.v1.employee import router as employee_router
+from app.api.v1.gmail import router as gmail_router
+from app.api.v1.candidate_portal import router as portal_router
 
 def create_app() -> FastAPI:
     # ... (existing setup)
@@ -44,6 +50,12 @@ def create_app() -> FastAPI:
     app.include_router(candidates_router, prefix="/api/v1")
     app.include_router(matching_router, prefix="/api/v1")
     app.include_router(feedback_router, prefix="/api/v1")
+    app.include_router(clients_router, prefix="/api/v1")
+    app.include_router(submissions_router, prefix="/api/v1")
+    app.include_router(admin_router, prefix="/api/v1")
+    app.include_router(employee_router, prefix="/api/v1")
+    app.include_router(gmail_router, prefix="/api/v1")
+    app.include_router(portal_router, prefix="/api/v1")
 
     @app.get("/health", tags=["Health"])
     async def health_check():
