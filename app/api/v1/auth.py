@@ -124,3 +124,42 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
         company_name=company_name,
         is_active=current_user.is_active
     )
+
+
+# ─── Change Own Password ──────────────────────────────────────────────────────
+from pydantic import BaseModel as _BaseModel
+
+class ChangePasswordRequest(_BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+@router.patch(
+    "/change-password",
+    status_code=status.HTTP_200_OK,
+    summary="Change the currently authenticated user's password"
+)
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import select
+    from app.layer6_data.models.user_model import UserModel
+
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    if not PasswordHasher.verify(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    res = await db.execute(select(UserModel).where(UserModel.id == current_user.id))
+    user_model = res.scalar_one_or_none()
+    if not user_model:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_model.hashed_password = PasswordHasher.hash(payload.new_password)
+    await db.flush()
+    return {"message": "Password updated successfully"}

@@ -508,6 +508,34 @@ async def update_employee(
     }
 
 
+class ResetPasswordPayload(BaseModel):
+    new_password: str
+
+
+@router.post("/employees/{employee_id}/reset-password", status_code=200)
+async def reset_employee_password(
+    employee_id: str,
+    payload: ResetPasswordPayload,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    res = await db.execute(
+        select(UserModel)
+        .where(UserModel.id == employee_id)
+        .where(UserModel.company_id == current_user.company_id)
+    )
+    emp = res.scalar_one_or_none()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    emp.hashed_password = PasswordHasher.hash(payload.new_password)
+    await db.flush()
+    return {"message": f"Password reset for {emp.first_name} {emp.last_name}"}
+
+
 # ── Notifications ─────────────────────────────────────────────────────────────
 
 @router.get("/notifications")
