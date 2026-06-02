@@ -132,8 +132,7 @@ export default function TeamSettingsPage() {
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="settings-page">
-      <div className="settings-content">
+    <div className="settings-content">
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--spacing-8)' }}>
           Team
         </h1>
