@@ -61,8 +61,8 @@ class CandidateSubmissionModel(Base):
     submitted_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # One candidate per job (first-come-first-serve)
-    __table_args__ = (UniqueConstraint("job_id", "candidate_email", name="_job_email_uc"),)
+    # One candidate per job per recruiter (each recruiter tracks their own submissions independently)
+    __table_args__ = (UniqueConstraint("job_id", "candidate_email", "submitted_by", name="_job_email_submitter_uc"),)
 
     # Relationships
     job = relationship("JobModel", back_populates="submissions")
