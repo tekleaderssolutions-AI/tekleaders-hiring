@@ -235,16 +235,24 @@ async def list_candidates(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from sqlalchemy import select, func, and_
+    from sqlalchemy import select, func, and_, or_
     from app.layer6_data.models.resume.candidate_model import CandidateModel
     from app.layer6_data.models.resume.resume_model import ResumeModel
     from app.layer6_data.models.user_model import UserModel
+    from app.layer6_data.models.candidate_submission_model import CandidateSubmissionModel
 
     # Subquery: latest resume created_at per candidate
     latest_sq = (
         select(ResumeModel.candidate_id, func.max(ResumeModel.created_at).label("max_at"))
         .group_by(ResumeModel.candidate_id)
         .subquery()
+    )
+
+    # For recruiters: candidates they submitted (handles checkpoint reuse where uploaded_by != self)
+    submitted_candidate_ids_sq = (
+        select(CandidateSubmissionModel.candidate_id)
+        .where(CandidateSubmissionModel.submitted_by == current_user.id)
+        .where(CandidateSubmissionModel.candidate_id.isnot(None))
     )
 
     stmt = (
@@ -273,7 +281,10 @@ async def list_candidates(
         )
         .outerjoin(UserModel, UserModel.id == ResumeModel.uploaded_by)
         .where(
-            ResumeModel.uploaded_by == current_user.id
+            or_(
+                ResumeModel.uploaded_by == current_user.id,
+                CandidateModel.id.in_(submitted_candidate_ids_sq),
+            )
             if current_user.role == "recruiter"
             else ResumeModel.uploaded_by.in_(
                 select(UserModel.id).where(UserModel.company_id == current_user.company_id)
