@@ -262,7 +262,10 @@ export default function RecruiterDashboardPage() {
                           {jd.priority && (
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: PRIORITY_COLOR[jd.priority] || '#6b7280', flexShrink: 0 }} />
                           )}
-                          <span style={{ fontSize: 15, fontWeight: 700, color: '#00756a' }}>
+                          <span
+                            style={{ fontSize: 15, fontWeight: 700, color: '#00756a', textDecoration: 'underline', cursor: 'pointer' }}
+                            onClick={e => { e.stopPropagation(); setViewingJdId(jd.job_id); }}
+                          >
                             {jd.title || 'Untitled'}
                           </span>
                           {jd.is_assigned && (
