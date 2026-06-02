@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     FIRST_ADMIN_EMAIL: str = ""
     # Optionally reset the admin password on startup (clear after use)
     FIRST_ADMIN_PASSWORD: str = ""
+    # Company name used during bootstrap (updates existing "Hirix Company" too)
+    COMPANY_NAME: str = "Hirix Company"
 
     # AWS S3 (optional — for resume file storage)
     AWS_ACCESS_KEY_ID: str = ""

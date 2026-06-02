@@ -73,7 +73,18 @@ async def sync_schema():
                 print(f"  [WARN] Patch skipped ({e})")
         print("  [OK] Schema patches applied.")
 
-        # 4. Bootstrap first admin — create or update
+        # 4. Update company name if COMPANY_NAME env var is customised
+        if settings.COMPANY_NAME and settings.COMPANY_NAME != "Hirix Company":
+            try:
+                await conn.execute(
+                    text("UPDATE companies SET name = :name WHERE name = 'Hirix Company'"),
+                    {"name": settings.COMPANY_NAME}
+                )
+                print(f"  [OK] Company name updated to: {settings.COMPANY_NAME}")
+            except Exception as e:
+                print(f"  [WARN] Could not update company name: {e}")
+
+        # 5. Bootstrap first admin — create or update
         if settings.FIRST_ADMIN_EMAIL and settings.FIRST_ADMIN_PASSWORD:
             try:
                 import uuid as _uuid
