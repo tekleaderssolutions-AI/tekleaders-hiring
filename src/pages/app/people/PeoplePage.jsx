@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { UserPlus, Users } from 'lucide-react';
 import api from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 
 function useEmployees() {
   return useQuery({
@@ -21,17 +22,21 @@ const ROLE_COLORS = {
 export default function PeoplePage() {
   const navigate = useNavigate();
   const { data: employees = [], isLoading } = useEmployees();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div className="people-page">
       <div className="people-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)' }}>People</h1>
-        <button
-          onClick={() => navigate('/team')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#00756a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-        >
-          <UserPlus size={15} /> Add Employee
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/team')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#00756a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <UserPlus size={15} /> Add Employee
+          </button>
+        )}
       </div>
 
       {isLoading ? (
