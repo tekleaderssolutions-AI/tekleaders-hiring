@@ -23,30 +23,27 @@ async def employee_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     uid = str(current_user.id)
-    cid = str(current_user.company_id) if current_user.company_id else None
 
-    # Formally assigned job IDs
+    # Only JDs explicitly assigned to this recruiter
     assign_res = await db.execute(
         select(JDAssignmentModel).where(JDAssignmentModel.employee_id == uid)
     )
     assignments = assign_res.scalars().all()
     assigned_job_ids = {a.job_id: a for a in assignments}
 
-    # All submissions by this recruiter
-    sub_res = await db.execute(
-        select(CandidateSubmissionModel)
-        .where(CandidateSubmissionModel.submitted_by == uid)
-    )
-    my_submissions = sub_res.scalars().all()
-    subs_by_job: dict[str, int] = {}
-    for s in my_submissions:
-        subs_by_job[s.job_id] = subs_by_job.get(s.job_id, 0) + 1
+    if not assigned_job_ids:
+        return {
+            "assigned_jds": [],
+            "summary": {"total": 0, "active": 0, "pending": 0, "completed": 0},
+            "my_submissions": 0,
+        }
 
-    # All company JDs (so recruiters can see every JD, not just assigned ones)
-    jobs_query = select(JobModel)
-    if cid:
-        jobs_query = jobs_query.where(JobModel.company_id == cid)
-    jobs_res = await db.execute(jobs_query.order_by(JobModel.created_at.desc()))
+    # Fetch only those jobs
+    jobs_res = await db.execute(
+        select(JobModel)
+        .where(JobModel.id.in_(list(assigned_job_ids.keys())))
+        .order_by(JobModel.created_at.desc())
+    )
     all_jobs = jobs_res.scalars().all()
 
     if not all_jobs:
@@ -57,6 +54,17 @@ async def employee_dashboard(
         }
 
     all_job_ids = [j.id for j in all_jobs]
+
+    # All submissions by this recruiter (for assigned jobs only)
+    sub_res = await db.execute(
+        select(CandidateSubmissionModel)
+        .where(CandidateSubmissionModel.submitted_by == uid)
+        .where(CandidateSubmissionModel.job_id.in_(all_job_ids))
+    )
+    my_submissions = sub_res.scalars().all()
+    subs_by_job: dict[str, int] = {}
+    for s in my_submissions:
+        subs_by_job[s.job_id] = subs_by_job.get(s.job_id, 0) + 1
 
     # Shortlisted counts (interview invitations sent by this recruiter)
     shortlisted_by_job: dict[str, int] = {}
@@ -92,18 +100,19 @@ async def employee_dashboard(
             "target_count": job.target_count or 1,
             "my_submissions": subs_by_job.get(job.id, 0),
             "shortlisted": shortlisted_by_job.get(job.id, 0),
-            "is_assigned": job.id in assigned_job_ids,
+            "is_assigned": True,
             "assigned_at": assignment.assigned_at.isoformat() if assignment and assignment.assigned_at else None,
         })
 
-    # Sort: assigned first, then by my submissions desc, then by created date
-    jd_cards.sort(key=lambda j: (0 if j["is_assigned"] else 1, -j["my_submissions"]))
+    # Sort by submissions desc, then by created date
+    jd_cards.sort(key=lambda j: -j["my_submissions"])
 
     summary = {
         "total": len(jd_cards),
         "active": sum(1 for j in jd_cards if j["status"] == "open"),
         "pending": sum(1 for j in jd_cards if j["status"] in ("draft", "on_hold")),
         "completed": sum(1 for j in jd_cards if j["status"] == "closed"),
+        "assigned": len(jd_cards),
     }
 
     return {
