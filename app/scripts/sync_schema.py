@@ -75,15 +75,47 @@ async def sync_schema():
                 print(f"  [WARN] Patch skipped ({e})")
         print("  [OK] Schema patches applied.")
 
-        # 4. Update company name if COMPANY_NAME env var is customised
+        # 4. Update company name / merge companies if COMPANY_NAME env var is customised
         if settings.COMPANY_NAME and settings.COMPANY_NAME != "Hirix Company":
             try:
-                await conn.execute(
-                    text("UPDATE companies SET name = :name WHERE name = 'Hirix Company'"),
+                await conn.execute(text("SAVEPOINT company_sp"))
+
+                # Check whether the target company already exists
+                target_res = await conn.execute(
+                    text("SELECT id FROM companies WHERE name = :name"),
                     {"name": settings.COMPANY_NAME}
                 )
-                print(f"  [OK] Company name updated to: {settings.COMPANY_NAME}")
+                target_row = target_res.fetchone()
+
+                if target_row:
+                    # Target company exists → merge ALL other companies' data into it
+                    tid = target_row[0]
+                    for tbl in ("users", "jobs", "memories", "candidate_submissions",
+                                "notifications", "clients"):
+                        try:
+                            await conn.execute(
+                                text(f"UPDATE {tbl} SET company_id = :tid WHERE company_id != :tid AND company_id IS NOT NULL"),
+                                {"tid": tid}
+                            )
+                        except Exception:
+                            pass  # table may not have company_id
+                    # Also fix orphaned NULL company_id rows
+                    await conn.execute(
+                        text("UPDATE users SET company_id = :tid WHERE company_id IS NULL"),
+                        {"tid": tid}
+                    )
+                    print(f"  [OK] Merged all companies/users into: {settings.COMPANY_NAME}")
+                else:
+                    # No target company yet — rename the old one
+                    await conn.execute(
+                        text("UPDATE companies SET name = :name WHERE name = 'Hirix Company'"),
+                        {"name": settings.COMPANY_NAME}
+                    )
+                    print(f"  [OK] Company name updated to: {settings.COMPANY_NAME}")
+
+                await conn.execute(text("RELEASE SAVEPOINT company_sp"))
             except Exception as e:
+                await conn.execute(text("ROLLBACK TO SAVEPOINT company_sp"))
                 print(f"  [WARN] Could not update company name: {e}")
 
         # 5. Bootstrap first admin — create or update
