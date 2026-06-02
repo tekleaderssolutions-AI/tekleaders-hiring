@@ -11,7 +11,11 @@ const useAuthStore = create((set, get) => ({
   login: async (token) => {
     setToken(token);
     set({ token });
-    await get().fetchProfile();
+    try {
+      await get().fetchProfile();
+    } catch {
+      // fetchProfile failure is handled inside fetchProfile itself
+    }
   },
 
   logout: () => {
