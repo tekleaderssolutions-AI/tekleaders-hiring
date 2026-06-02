@@ -968,7 +968,13 @@ _ce_model = None
 
 
 def _load_cross_encoder():
-    """Load cross-encoder/ms-marco-MiniLM-L-6-v2 once per process (CPU-friendly, ~85 MB)."""
+    """Load cross-encoder/ms-marco-MiniLM-L-6-v2 once per process (CPU-friendly, ~85 MB).
+    Disabled by default — requires ENABLE_CROSS_ENCODER=true env var.
+    Downloads ~85 MB from HuggingFace and blocks the event loop; not safe on Render free tier.
+    """
+    import os
+    if os.getenv("ENABLE_CROSS_ENCODER", "false").lower() != "true":
+        return None  # Disabled — use RRF scores directly
     global _ce_model
     if _ce_model is None:
         try:
