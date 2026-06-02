@@ -25,15 +25,23 @@ async def fetch_and_align(
     """
     if not current_user.company_id:
         raise HTTPException(status_code=400, detail="User must belong to a company")
-        
+
+    # Scope AI scan to the current recruiter's own submissions; admins see all
+    role = (current_user.role or "").lower().strip()
+    recruiter_id = None if role == "admin" else current_user.id
+
     use_case = FetchAndAlignUseCase(db)
     try:
         results = await use_case.execute(
-            job_id=job_id, 
+            job_id=job_id,
             company_id=current_user.company_id,
             top_k=top_k,
-            rerank_threshold=rerank_threshold
+            rerank_threshold=rerank_threshold,
+            recruiter_id=recruiter_id,
         )
         return results
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"AI scan error: {str(e)}")

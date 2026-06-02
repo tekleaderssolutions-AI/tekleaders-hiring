@@ -1072,10 +1072,10 @@ class FetchAndAlignUseCase:
             print(f"[BM25] Search failed: {e}")
             return []
 
-    async def execute(self, job_id: str, company_id: str, top_k: int = 10, rerank_threshold: float = 60.0) -> List[Dict]:
-        # ── 0. Resolve allowed resume IDs for this job (job-scoped scan) ──
+    async def execute(self, job_id: str, company_id: str, top_k: int = 10, rerank_threshold: float = 60.0, recruiter_id: Optional[str] = None) -> List[Dict]:
+        # ── 0. Resolve allowed resume IDs (scoped to recruiter when provided) ──
         from app.layer6_data.models.candidate_submission_model import CandidateSubmissionModel, SubmissionStatus
-        sub_res = await self.db.execute(
+        sub_query = (
             select(CandidateSubmissionModel.resume_id)
             .where(
                 CandidateSubmissionModel.job_id == job_id,
@@ -1083,6 +1083,9 @@ class FetchAndAlignUseCase:
                 CandidateSubmissionModel.status != SubmissionStatus.WITHDRAWN,
             )
         )
+        if recruiter_id:
+            sub_query = sub_query.where(CandidateSubmissionModel.submitted_by == recruiter_id)
+        sub_res = await self.db.execute(sub_query)
         allowed_resume_ids: list = [row[0] for row in sub_res.all()]
         if not allowed_resume_ids:
             return []   # No resumes submitted for this job yet
@@ -1131,7 +1134,7 @@ class FetchAndAlignUseCase:
         BM25_POOL    = 200
         RRF_K        = 60                      # standard RRF constant
         CE_TOP_N     = min(30, VECTOR_POOL)    # candidates sent to cross-encoder
-        LLM_TOP_N    = 20                      # candidates sent to LLM after CE rerank
+        LLM_TOP_N    = 5                       # candidates sent to LLM (reduced to avoid Render timeout)
 
         vector_query = text("""
             SELECT * FROM (

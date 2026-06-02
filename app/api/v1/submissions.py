@@ -160,8 +160,10 @@ async def list_submissions_for_job(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Employees can only see submissions for their assigned JDs
-    if current_user.role == "recruiter":
+    role = (current_user.role or "").lower().strip()
+
+    # Non-admins must be assigned to the JD
+    if role != "admin":
         assign_res = await db.execute(
             select(JDAssignmentModel)
             .where(JDAssignmentModel.job_id == job_id)
@@ -170,12 +172,18 @@ async def list_submissions_for_job(
         if not assign_res.scalar_one_or_none():
             raise HTTPException(status_code=403, detail="You are not assigned to this JD")
 
-    result = await db.execute(
+    query = (
         select(CandidateSubmissionModel)
         .where(CandidateSubmissionModel.job_id == job_id)
         .where(CandidateSubmissionModel.company_id == current_user.company_id)
-        .order_by(CandidateSubmissionModel.submitted_at.desc())
     )
+
+    # Non-admins only see resumes they uploaded themselves
+    if role != "admin":
+        query = query.where(CandidateSubmissionModel.submitted_by == current_user.id)
+
+    query = query.order_by(CandidateSubmissionModel.submitted_at.desc())
+    result = await db.execute(query)
     submissions = result.scalars().all()
 
     from app.layer6_data.models.user_model import UserModel
