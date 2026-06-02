@@ -11,7 +11,7 @@ import {
   EXPERIENCE_LEVELS,
   EDUCATION_LEVELS
 } from '@/lib/constants';
-import { useCreateJob, useNextJobCode, useAnalyzeJob } from '@/hooks/useJobs';
+import { useCreateJob, useNextJobCode, useAnalyzeJob, useGenerateJD } from '@/hooks/useJobs';
 import { useCandidates, useUploadCandidates, useFetchAndAlign, useBulkProgress } from '@/hooks/useCandidates';
 import CandidateMatchCard from '@/components/candidates/CandidateMatchCard';
 import useUiStore from '@/store/uiStore';
@@ -34,6 +34,7 @@ export default function JobNewPage() {
   const { data: nextCode } = useNextJobCode();
   const { data: clients = [] } = useClients();
   const analyzeJob = useAnalyzeJob();
+  const generateJD = useGenerateJD();
   const uploadCandidates = useUploadCandidates();
   const fetchAndAlign = useFetchAndAlign();
   const addToast = useUiStore(s => s.addToast);
@@ -98,7 +99,35 @@ export default function JobNewPage() {
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
-  
+
+  const handleGenerateJD = async () => {
+    if (!formData.title) {
+      addToast({ title: 'Missing Role Title', message: 'Please enter a job title before generating.', type: 'error' });
+      return;
+    }
+    try {
+      const result = await generateJD.mutateAsync({
+        title: formData.title,
+        department: formData.department,
+        industry: formData.industry,
+        location: formData.location,
+        workplace_type: formData.workplace_type,
+        experience_level: formData.experience_level,
+        employment_type: formData.employment_type,
+        keywords: formData.keywords,
+      });
+      setFormData(prev => ({
+        ...prev,
+        description: result.description || prev.description,
+        requirements: result.requirements || prev.requirements,
+        benefits: result.benefits || prev.benefits,
+      }));
+      addToast({ title: 'JD Generated', message: 'Review and edit the generated content below.', type: 'success' });
+    } catch (err) {
+      addToast({ title: 'Generation Failed', message: err?.response?.data?.detail || 'AI generation failed.', type: 'error' });
+    }
+  };
+
   const handleSave = async (isDraft = true) => {
     try {
       const workplaceMap = {
@@ -452,11 +481,27 @@ export default function JobNewPage() {
 
         {/* Description */}
         <div className="form-section-card">
-          <button className="ai-generate-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
-            Generate with AI
-          </button>
-          <h3 className="form-section-title">Description</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 className="form-section-title" style={{ margin: 0 }}>Description</h3>
+            <button
+              className="ai-generate-btn"
+              onClick={handleGenerateJD}
+              disabled={generateJD.isPending}
+              style={{ opacity: generateJD.isPending ? 0.7 : 1, cursor: generateJD.isPending ? 'not-allowed' : 'pointer' }}
+            >
+              {generateJD.isPending ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+                  Generate with AI
+                </>
+              )}
+            </button>
+          </div>
           
           <div className="form-field">
             <label className="form-label-custom"><span>*</span>About the role</label>

@@ -45,3 +45,9 @@ export function useAnalyzeJob() {
     mutationFn: (formData) => api.post('/jobs/analyze', formData).then((r) => r.data),
   });
 }
+
+export function useGenerateJD() {
+  return useMutation({
+    mutationFn: (payload) => api.post('/jobs/generate-description', payload).then((r) => r.data),
+  });
+}

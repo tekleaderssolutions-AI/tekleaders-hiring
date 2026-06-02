@@ -403,6 +403,11 @@
   outline: none;
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .ai-generate-btn {
   background: #a78bfa;
   color: white;
@@ -415,11 +420,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  float: right;
-  margin-bottom: 12px;
 }
 
-.ai-generate-btn:hover {
+.ai-generate-btn:hover:not(:disabled) {
   background: #8b5cf6;
 }
 
