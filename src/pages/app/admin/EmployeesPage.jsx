@@ -32,7 +32,7 @@ const ROLE_COLORS = {
   hiring_manager: { bg: '#ede9fe', color: '#7c3aed' },
 };
 
-const ROLE_OPTIONS = ['recruiter', 'hiring_manager'];
+const ROLE_OPTIONS = ['recruiter', 'hiring_manager', 'admin'];
 
 const EMPTY_FORM = { first_name: '', last_name: '', email: '', password: '', role: 'recruiter' };
 
