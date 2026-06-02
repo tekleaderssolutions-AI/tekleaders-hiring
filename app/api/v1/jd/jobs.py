@@ -194,7 +194,7 @@ async def get_next_job_code(
 
 @router.get(
     "",
-    summary="List jobs — admin sees all, recruiter sees only assigned"
+    summary="List jobs — admin sees all, everyone else sees only assigned"
 )
 async def list_jobs(
     current_user: User = Depends(get_current_user),
@@ -206,7 +206,8 @@ async def list_jobs(
     if not current_user.company_id:
         return []
 
-    if current_user.role == "recruiter":
+    role = (current_user.role or "").lower().strip()
+    if role != "admin":
         assign_res = await db.execute(
             select(JDAssignmentModel.job_id).where(JDAssignmentModel.employee_id == current_user.id)
         )
