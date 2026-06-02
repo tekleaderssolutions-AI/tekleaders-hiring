@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge, Button } from '@/components/ui';
 export default function BillingPage() {
   return (
-    <div className="settings-page"><div className="settings-content">
+    <div className="settings-content">
       <h1 style={{ fontSize:'var(--text-2xl)', fontWeight:'var(--weight-bold)', marginBottom:'var(--spacing-8)' }}>Billing</h1>
       <div className="card" style={{ padding:'var(--spacing-6)', marginBottom:'var(--spacing-6)' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -17,6 +17,6 @@ export default function BillingPage() {
         <div style={{ display:'flex', justifyContent:'space-between', padding:'var(--spacing-2) 0', fontSize:'var(--text-sm)' }}><span style={{ color:'var(--color-text-muted)' }}>Team Members</span><span>8 / 25</span></div>
       </div>
       <div style={{ marginTop:'var(--spacing-6)', display:'flex', gap:'var(--spacing-3)' }}><Button variant="primary">Upgrade Plan</Button><Button variant="ghost">Cancel Subscription</Button></div>
-    </div></div>
+    </div>
   );
 }

@@ -201,6 +201,5 @@ export default function TeamSettingsPage() {
           <ResetPasswordModal employee={resetTarget} onClose={() => setResetTarget(null)} />
         )}
       </div>
-    </div>
   );
 }

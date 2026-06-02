@@ -49,6 +49,7 @@ import DiversityPage from '@/pages/app/reports/DiversityPage';
 import CustomReportPage from '@/pages/app/reports/CustomReportPage';
 import FilesPage from '@/pages/app/files/FilesPage';
 import InboxPage from '@/pages/app/inbox/InboxPage';
+import SettingsLayout from '@/pages/app/settings/SettingsLayout';
 import CompanySettingsPage from '@/pages/app/settings/CompanySettingsPage';
 import TeamSettingsPage from '@/pages/app/settings/TeamSettingsPage';
 import AIAutomationPage from '@/pages/app/settings/AIAutomationPage';
@@ -133,13 +134,15 @@ export default function AppRouter() {
             <Route path="/inbox" element={<InboxPage />} />
 
             {/* Settings */}
-            <Route path="/settings" element={<CompanySettingsPage />} />
-            <Route path="/settings/team" element={<TeamSettingsPage />} />
-            <Route path="/settings/ai-automation" element={<AIAutomationPage />} />
-            <Route path="/settings/integrations" element={<IntegrationsPage />} />
-            <Route path="/settings/billing" element={<BillingPage />} />
-            <Route path="/settings/security" element={<SecurityPage />} />
-            <Route path="/settings/api-keys" element={<APIKeysPage />} />
+            <Route element={<SettingsLayout />}>
+              <Route path="/settings" element={<CompanySettingsPage />} />
+              <Route path="/settings/team" element={<TeamSettingsPage />} />
+              <Route path="/settings/security" element={<SecurityPage />} />
+              <Route path="/settings/integrations" element={<IntegrationsPage />} />
+              <Route path="/settings/api-keys" element={<APIKeysPage />} />
+              <Route path="/settings/ai-automation" element={<AIAutomationPage />} />
+              <Route path="/settings/billing" element={<BillingPage />} />
+            </Route>
           </Route>
         </Route>
       </Routes>

@@ -7,7 +7,7 @@ const keys = [
 ];
 export default function APIKeysPage() {
   return (
-    <div className="settings-page"><div className="settings-content">
+    <div className="settings-content">
       <h1 style={{ fontSize:'var(--text-2xl)', fontWeight:'var(--weight-bold)', marginBottom:'var(--spacing-8)' }}>API Keys</h1>
       <Button variant="primary" style={{ marginBottom:'var(--spacing-6)' }}>Generate New Key</Button>
       <div style={{ display:'flex', flexDirection:'column', gap:'var(--spacing-4)' }}>
@@ -27,6 +27,6 @@ export default function APIKeysPage() {
           </div>
         ))}
       </div>
-    </div></div>
+    </div>
   );
 }

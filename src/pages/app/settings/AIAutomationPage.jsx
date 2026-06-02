@@ -8,7 +8,7 @@ export default function AIAutomationPage() {
     { name:'Weekly pipeline digest', desc:'Send AI summary every Monday', enabled:true },
   ];
   return (
-    <div className="settings-page"><div className="settings-content">
+    <div className="settings-content">
       <h1 style={{ fontSize:'var(--text-2xl)', fontWeight:'var(--weight-bold)', marginBottom:'var(--spacing-8)' }}>AI Automation</h1>
       <div style={{ display:'flex', flexDirection:'column', gap:'var(--spacing-4)' }}>
         {automations.map((a) => (
@@ -23,6 +23,6 @@ export default function AIAutomationPage() {
           </div>
         ))}
       </div>
-    </div></div>
+    </div>
   );
 }

@@ -2,8 +2,7 @@ import React from 'react';
 import { Input, Button } from '@/components/ui';
 export default function CompanySettingsPage() {
   return (
-    <div className="settings-page">
-      <div className="settings-content">
+    <div className="settings-content">
         <h1 style={{ fontSize:'var(--text-2xl)', fontWeight:'var(--weight-bold)', marginBottom:'var(--spacing-8)' }}>Company Settings</h1>
         <div className="settings-section">
           <h3 className="settings-section-title">General Information</h3>
@@ -19,6 +18,5 @@ export default function CompanySettingsPage() {
         </div>
         <Button variant="primary">Save Changes</Button>
       </div>
-    </div>
   );
 }

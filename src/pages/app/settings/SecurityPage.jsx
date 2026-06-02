@@ -52,8 +52,7 @@ export default function SecurityPage() {
   };
 
   return (
-    <div className="settings-page">
-      <div className="settings-content">
+    <div className="settings-content">
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)', marginBottom: 'var(--spacing-8)' }}>
           Security
         </h1>
@@ -138,6 +137,5 @@ export default function SecurityPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

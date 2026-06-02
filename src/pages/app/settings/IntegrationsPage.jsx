@@ -8,7 +8,7 @@ const integrations = [
 ];
 export default function IntegrationsPage() {
   return (
-    <div className="settings-page"><div className="settings-content">
+    <div className="settings-content">
       <h1 style={{ fontSize:'var(--text-2xl)', fontWeight:'var(--weight-bold)', marginBottom:'var(--spacing-8)' }}>Integrations</h1>
       <div style={{ display:'flex', flexDirection:'column', gap:'var(--spacing-4)' }}>
         {integrations.map((i) => (
@@ -18,6 +18,6 @@ export default function IntegrationsPage() {
           </div>
         ))}
       </div>
-    </div></div>
+    </div>
   );
 }
