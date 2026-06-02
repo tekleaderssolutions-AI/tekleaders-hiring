@@ -4,6 +4,7 @@ from sqlalchemy import select
 import uuid
 import os
 import shutil
+import json
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -16,8 +17,78 @@ from app.layer6_data.models.company_model import CompanyModel
 from app.layer6_data.models.jd.job_model import JobModel
 from app.dependencies import get_db, get_current_user, require_admin
 from app.layer5_domain.entities.user import User
+from app.config import settings
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+
+class GenerateJDRequest(BaseModel):
+    title: str
+    department: str = ""
+    industry: str = ""
+    location: str = ""
+    workplace_type: str = ""
+    experience_level: str = ""
+    employment_type: str = ""
+    keywords: str = ""  # comma-separated skills hint
+
+
+@router.post(
+    "/generate-description",
+    status_code=status.HTTP_200_OK,
+    summary="Generate a full JD (description, requirements, benefits) from basic inputs using AI"
+)
+async def generate_jd_description(
+    payload: GenerateJDRequest,
+    current_user: User = Depends(get_current_user),
+):
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    skills_hint = payload.keywords.strip()
+    prompt = f"""You are an expert HR professional and technical recruiter.
+Generate a comprehensive, professional job description for the following role.
+
+Role: {payload.title}
+Department: {payload.department or "Not specified"}
+Industry: {payload.industry or "Not specified"}
+Location: {payload.location or "Not specified"} ({payload.workplace_type or "On-site"})
+Experience Level: {payload.experience_level or "Not specified"}
+Employment Type: {payload.employment_type or "Full-time"}
+Key Skills: {skills_hint or "To be determined based on role"}
+
+Return ONLY a valid JSON object with exactly these three keys:
+{{
+  "description": "A compelling 2-3 paragraph About the Role section that excites candidates and clearly explains impact and responsibilities.",
+  "requirements": "A plain-text bulleted list (use • bullet) of 8-10 must-have technical skills, qualifications, and soft skills.",
+  "benefits": "A plain-text bulleted list (use • bullet) of 5-7 attractive benefits and perks."
+}}
+
+Do not include markdown, code fences, or any text outside the JSON."""
+
+    try:
+        response = await client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=1500,
+        )
+        raw = response.choices[0].message.content.strip()
+        # Strip any accidental markdown code fences
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+        return {
+            "description": result.get("description", ""),
+            "requirements": result.get("requirements", ""),
+            "benefits": result.get("benefits", ""),
+        }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"AI returned invalid JSON: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {e}")
 
 @router.post(
     "/analyze",
