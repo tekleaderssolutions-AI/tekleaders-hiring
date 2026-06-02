@@ -29,11 +29,12 @@ async def _create_submission_from_resume(db, resume_id: str, job_id: str, user_i
     if not candidate:
         return
 
-    # Skip if already submitted for this job
+    # Skip if this recruiter already submitted this candidate for this job
     existing = await db.execute(
         select(CandidateSubmissionModel)
         .where(CandidateSubmissionModel.job_id == job_id)
         .where(CandidateSubmissionModel.candidate_email == candidate.email)
+        .where(CandidateSubmissionModel.submitted_by == user_id)
         .where(CandidateSubmissionModel.status != SubmissionStatus.WITHDRAWN)
     )
     if existing.scalar_one_or_none():
