@@ -417,12 +417,12 @@ async def list_employees(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    res = await db.execute(
-        select(UserModel)
-        .where(UserModel.company_id == current_user.company_id)
-        .where(UserModel.id != current_user.id)
-        .order_by(UserModel.created_at.desc())
-    )
+    query = select(UserModel).order_by(UserModel.created_at.desc())
+    if current_user.company_id:
+        query = query.where(UserModel.company_id == current_user.company_id)
+    else:
+        return []
+    res = await db.execute(query)
     employees = res.scalars().all()
     return [
         {
@@ -433,6 +433,7 @@ async def list_employees(
             "email": e.email,
             "role": e.role.value if hasattr(e.role, "value") else e.role,
             "is_active": e.is_active,
+            "is_current_user": e.id == current_user.id,
             "created_at": e.created_at.isoformat() if e.created_at else None,
         }
         for e in employees
