@@ -235,7 +235,7 @@ async def list_candidates(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from sqlalchemy import select, func, and_, or_
+    from sqlalchemy import select, func, and_
     from app.layer6_data.models.resume.candidate_model import CandidateModel
     from app.layer6_data.models.resume.resume_model import ResumeModel
     from app.layer6_data.models.user_model import UserModel
@@ -246,13 +246,6 @@ async def list_candidates(
         select(ResumeModel.candidate_id, func.max(ResumeModel.created_at).label("max_at"))
         .group_by(ResumeModel.candidate_id)
         .subquery()
-    )
-
-    # For recruiters: candidates they submitted (handles checkpoint reuse where uploaded_by != self)
-    submitted_candidate_ids_sq = (
-        select(CandidateSubmissionModel.candidate_id)
-        .where(CandidateSubmissionModel.submitted_by == current_user.id)
-        .where(CandidateSubmissionModel.candidate_id.isnot(None))
     )
 
     stmt = (
@@ -280,20 +273,26 @@ async def list_candidates(
             ),
         )
         .outerjoin(UserModel, UserModel.id == ResumeModel.uploaded_by)
-        .where(
-            or_(
-                ResumeModel.uploaded_by == current_user.id,
-                CandidateModel.id.in_(submitted_candidate_ids_sq),
-            )
-            if current_user.role == "recruiter"
-            else ResumeModel.uploaded_by.in_(
+    )
+
+    if current_user.role == "recruiter":
+        # Recruiter: only candidates they personally submitted — strict per-recruiter isolation
+        stmt = stmt.join(
+            CandidateSubmissionModel,
+            and_(
+                CandidateSubmissionModel.candidate_id == CandidateModel.id,
+                CandidateSubmissionModel.submitted_by == current_user.id,
+            ),
+        )
+    else:
+        # Admin / manager: all candidates uploaded by anyone in their company
+        stmt = stmt.where(
+            ResumeModel.uploaded_by.in_(
                 select(UserModel.id).where(UserModel.company_id == current_user.company_id)
             )
         )
-        .order_by(CandidateModel.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+
+    stmt = stmt.order_by(CandidateModel.created_at.desc()).limit(limit).offset(offset)
 
     result = await db.execute(stmt)
     rows = result.all()
@@ -315,8 +314,10 @@ async def list_candidates(
             )
             .join(JobModel, JobModel.id == CandidateSubmissionModel.job_id)
             .where(CandidateSubmissionModel.candidate_id.in_(candidate_ids))
-            .distinct()
         )
+        if current_user.role == "recruiter":
+            sub_stmt = sub_stmt.where(CandidateSubmissionModel.submitted_by == current_user.id)
+        sub_stmt = sub_stmt.distinct()
         sub_result = await db.execute(sub_stmt)
         for s in sub_result.all():
             if s.candidate_id in jobs_map:
