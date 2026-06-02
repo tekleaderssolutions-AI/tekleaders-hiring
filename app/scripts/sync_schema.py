@@ -60,6 +60,8 @@ async def sync_schema():
             "CREATE INDEX IF NOT EXISTS idx_candidate_submissions_candidate_id ON candidate_submissions(candidate_id)",
             "CREATE INDEX IF NOT EXISTS idx_jd_assignments_employee_id ON jd_assignments(employee_id)",
             "CREATE INDEX IF NOT EXISTS idx_jd_assignments_job_id ON jd_assignments(job_id)",
+            # Assign orphaned users (NULL company_id, e.g. from Google OAuth sign-up) to the primary company
+            "UPDATE users SET company_id = (SELECT id FROM companies ORDER BY created_at ASC LIMIT 1) WHERE company_id IS NULL",
         ]
         for patch in _patches:
             try:
