@@ -47,6 +47,8 @@ function buildNavSections(role) {
       title: 'Main',
       links: [
         { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { to: '/jobs', icon: Briefcase, label: 'My Jobs' },
+        { to: '/candidates', icon: Users, label: 'Candidates' },
         { to: '/copilot', icon: Bot, label: 'AI Copilot' },
       ],
     },

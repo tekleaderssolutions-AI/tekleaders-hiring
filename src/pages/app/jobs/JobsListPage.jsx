@@ -34,7 +34,8 @@ function formatDate(iso) {
 
 export default function JobsListPage() {
   const navigate = useNavigate();
-  const { org } = useAuth();
+  const { user, org } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const companyName = org?.name || 'My Company';
   const { data: jobs = [], isLoading } = useJobs();
   const [search, setSearch] = useState('');
@@ -53,12 +54,14 @@ export default function JobsListPage() {
       {/* Header */}
       <div className="jobs-header-minimal">
         <div className="jobs-company-title">
-          {companyName}
-          <span className="jobs-external-icon"><ExternalLink size={18} /></span>
+          {isAdmin ? companyName : 'My Assigned Jobs'}
+          {isAdmin && <span className="jobs-external-icon"><ExternalLink size={18} /></span>}
         </div>
-        <button className="btn-create-job" onClick={() => navigate('/jobs/new')}>
-          Create a new job
-        </button>
+        {isAdmin && (
+          <button className="btn-create-job" onClick={() => navigate('/jobs/new')}>
+            Create a new job
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -69,16 +72,22 @@ export default function JobsListPage() {
           <div style={{ marginBottom: 20, opacity: 0.25 }}>
             <Briefcase size={64} strokeWidth={1} color="#374151" />
           </div>
-          <h2 className="jobs-empty-title">Find candidates for job openings at your company</h2>
-          <p className="jobs-empty-desc">
-            <span
-              style={{ color: '#00756a', fontWeight: 600, cursor: 'pointer' }}
-              onClick={() => navigate('/jobs/new')}
-            >
-              Create a job
-            </span>{' '}
-            to write your job post and source candidates that match the job's requirements.
-          </p>
+          {isAdmin ? (
+            <>
+              <h2 className="jobs-empty-title">Find candidates for job openings at your company</h2>
+              <p className="jobs-empty-desc">
+                <span style={{ color: '#00756a', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate('/jobs/new')}>
+                  Create a job
+                </span>{' '}
+                to write your job post and source candidates that match the job's requirements.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="jobs-empty-title">No jobs assigned to you yet</h2>
+              <p className="jobs-empty-desc">Ask your admin to assign job openings to you.</p>
+            </>
+          )}
         </div>
       ) : (
         /* Job list */
@@ -104,7 +113,10 @@ export default function JobsListPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  {['Job Title', 'Assigned To', 'Priority', 'Status', 'Created', 'Actions'].map(h => (
+                  {(isAdmin
+                    ? ['Job Title', 'Assigned To', 'Priority', 'Status', 'Created', 'Actions']
+                    : ['Job Title', 'Priority', 'Status', 'Created', 'Actions']
+                  ).map(h => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                       {h}
                     </th>
@@ -117,21 +129,24 @@ export default function JobsListPage() {
                   const priorityKey = typeof job.priority === 'string' ? job.priority.toLowerCase() : 'medium';
                   const status = STATUS_CONFIG[statusKey] || STATUS_CONFIG.draft;
                   const priority = PRIORITY_CONFIG[priorityKey] || PRIORITY_CONFIG.medium;
+                  const dest = isAdmin ? `/jobs/${job.id}/assign` : `/jobs/${job.id}/pipeline`;
                   return (
                     <tr
                       key={job.id}
                       style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #f3f4f6' : 'none', cursor: 'pointer' }}
-                      onClick={() => navigate(`/jobs/${job.id}/assign`)}
+                      onClick={() => navigate(dest)}
                     >
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>{job.current_title || job.title || 'Untitled'}</div>
                         <div style={{ fontSize: 12, color: '#9ca3af' }}>{job.job_code}</div>
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: 13, color: '#374151' }}>
-                        {job.assigned_employees?.length > 0
-                          ? job.assigned_employees.join(', ')
-                          : <span style={{ color: '#9ca3af' }}>—</span>}
-                      </td>
+                      {isAdmin && (
+                        <td style={{ padding: '14px 16px', fontSize: 13, color: '#374151' }}>
+                          {job.assigned_employees?.length > 0
+                            ? job.assigned_employees.join(', ')
+                            : <span style={{ color: '#9ca3af' }}>—</span>}
+                        </td>
+                      )}
                       <td style={{ padding: '14px 16px' }}>
                         <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, background: priority.bg, color: priority.color, fontWeight: 700, textTransform: 'uppercase' }}>
                           {priorityKey}
@@ -145,10 +160,10 @@ export default function JobsListPage() {
                       <td style={{ padding: '14px 16px', fontSize: 13, color: '#6b7280' }}>{formatDate(job.created_at)}</td>
                       <td style={{ padding: '14px 16px' }}>
                         <button
-                          onClick={e => { e.stopPropagation(); navigate(`/jobs/${job.id}/assign`); }}
+                          onClick={e => { e.stopPropagation(); navigate(dest); }}
                           style={{ background: '#f9fafb', color: '#374151', border: '1px solid #e5e7eb', borderRadius: 6, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
                         >
-                          Manage
+                          {isAdmin ? 'Manage' : 'View'}
                         </button>
                       </td>
                     </tr>
