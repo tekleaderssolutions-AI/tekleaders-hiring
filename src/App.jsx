@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppRouter from './routes/AppRouter';
 import { useAuth } from '@/hooks/useAuth';
 import { getToken } from '@/lib/auth';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,8 +15,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-import { GoogleOAuthProvider } from '@react-oauth/google';
 
 export default function App() {
   const { fetchProfile } = useAuth();
@@ -27,10 +27,12 @@ export default function App() {
   }, [fetchProfile]);
 
   return (
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <QueryClientProvider client={queryClient}>
-        <AppRouter />
-      </QueryClientProvider>
-    </GoogleOAuthProvider>
+    <ErrorBoundary>
+      <GoogleOAuthProvider clientId={googleClientId}>
+        <QueryClientProvider client={queryClient}>
+          <AppRouter />
+        </QueryClientProvider>
+      </GoogleOAuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -32,7 +32,12 @@ const useAuthStore = create((set, get) => ({
       set({ user: userData, org, isFetchingProfile: false });
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
-      get().logout();
+      // Only hard-logout on 401 (token invalid/expired).
+      // Network errors or server blips on refresh must NOT wipe the session —
+      // that's what was causing blank pages mid-work.
+      if (error?.response?.status === 401) {
+        get().logout();
+      }
       set({ isFetchingProfile: false });
     }
   },

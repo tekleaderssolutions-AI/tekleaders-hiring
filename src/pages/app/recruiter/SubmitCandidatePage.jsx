@@ -548,7 +548,14 @@ function WorkflowTab({ submissions, jobId, jobTitle, job }) {
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 10 }}>{m.email}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, color: '#9ca3af' }}>{m.email}</span>
+                            {m.phone && (
+                              <span style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Phone size={11} color="#9ca3af" />{m.phone}
+                              </span>
+                            )}
+                          </div>
 
                           {/* Score bar */}
                           <div style={{ marginBottom: 4 }}>
@@ -987,6 +994,8 @@ export default function SubmitCandidatePage() {
   const [bulkSessionId, setBulkSessionId] = useState(null);
   const [done, setDone] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [multiProgress, setMultiProgress] = useState(null);
 
   const uploadCandidates = useUploadCandidates();
   const { data: bulkProgress } = useBulkProgress(bulkSessionId);
@@ -1014,21 +1023,60 @@ export default function SubmitCandidatePage() {
 
   const handleUpload = async () => {
     if (!files.length) return;
-    const fd = new FormData();
-    fd.append('file', files[0]);
-    fd.append('job_code', job?.job_code || '');
-    fd.append('job_id', jobId);
-    try {
-      const res = await uploadCandidates.mutateAsync({ formData: fd, jobCode: job?.job_code });
-      if (res?.session_id) {
-        setBulkSessionId(res.session_id);
-      } else {
-        setDone(true);
-        qc.invalidateQueries({ queryKey: ['job-submissions', jobId] });
-        qc.invalidateQueries({ queryKey: ['employee-dashboard'] });
+    setUploadError(null);
+
+    // Single ZIP → existing bulk path
+    if (files.length === 1 && files[0].name.toLowerCase().endsWith('.zip')) {
+      const fd = new FormData();
+      fd.append('file', files[0]);
+      fd.append('job_code', job?.job_code || '');
+      fd.append('job_id', jobId);
+      try {
+        const res = await uploadCandidates.mutateAsync({ formData: fd, jobCode: job?.job_code });
+        if (res?.session_id) {
+          setBulkSessionId(res.session_id);
+        } else {
+          setDone(true);
+          qc.invalidateQueries({ queryKey: ['job-submissions', jobId] });
+          qc.invalidateQueries({ queryKey: ['employee-dashboard'] });
+        }
+        setFiles([]);
+      } catch (e) {
+        setUploadError(e?.response?.data?.detail || 'Upload failed. Please try again.');
       }
-      setFiles([]);
-    } catch {}
+      return;
+    }
+
+    // Single or multiple PDF/DOC/DOCX → upload sequentially
+    const errors = [];
+    const warnings = [];
+    for (let i = 0; i < files.length; i++) {
+      setMultiProgress({ current: i + 1, total: files.length, name: files[i].name });
+      const fd = new FormData();
+      fd.append('file', files[i]);
+      fd.append('job_code', job?.job_code || '');
+      fd.append('job_id', jobId);
+      try {
+        const res = await uploadCandidates.mutateAsync({ formData: fd, jobCode: job?.job_code });
+        const sub = res?.submission;
+        if (sub?.status === 'duplicate_self') {
+          warnings.push(`"${sub.message}" is already in your submissions for this JD.`);
+        } else if (sub?.status === 'duplicate_other') {
+          warnings.push(`"${sub.message}" was already submitted by ${sub.submitted_by} for this JD.`);
+        }
+      } catch (e) {
+        const detail = e?.response?.data?.detail || 'Parse failed';
+        errors.push(`${files[i].name}: ${detail}`);
+      }
+    }
+
+    setMultiProgress(null);
+    setFiles([]);
+    setDone(true);
+    qc.invalidateQueries({ queryKey: ['job-submissions', jobId] });
+    qc.invalidateQueries({ queryKey: ['employee-dashboard'] });
+    const allMessages = [...errors.map(m => `❌ ${m}`), ...warnings.map(m => `⚠ ${m}`)];
+    if (allMessages.length > 0) setUploadError(allMessages.join('\n'));
   };
 
   const isPending = uploadCandidates.isPending;
@@ -1092,22 +1140,40 @@ export default function SubmitCandidatePage() {
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 28 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Upload Resumes</h2>
             <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 24 }}>
-              PDF, DOC, DOCX for a single resume · ZIP file for bulk upload
+              Select one or multiple PDF / DOC / DOCX · or a ZIP for bulk upload
             </p>
 
             {done ? (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
                 <CheckCircle size={52} color="#059669" style={{ marginBottom: 14 }} />
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 6 }}>Upload Complete!</div>
-                <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 24 }}>Resumes have been parsed and submitted.</div>
+                <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 8 }}>Resumes have been parsed and submitted.</div>
+                {uploadError && (
+                  <div style={{ marginBottom: 16, padding: '10px 14px', background: uploadError.includes('❌') ? '#fee2e2' : '#fef3c7', color: uploadError.includes('❌') ? '#dc2626' : '#92400e', borderRadius: 8, fontSize: 13, whiteSpace: 'pre-line', lineHeight: 1.7, textAlign: 'left' }}>{uploadError}</div>
+                )}
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                  <button onClick={() => { setDone(false); setFiles([]); }} style={{ background: '#00756a', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                  <button onClick={() => { setDone(false); setFiles([]); setUploadError(null); }} style={{ background: '#00756a', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                     Upload More
                   </button>
                   <button onClick={() => setActiveTab('workflow')} style={{ background: '#fff', color: '#00756a', border: '1px solid #00756a', borderRadius: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                     Save & Continue
                   </button>
                 </div>
+              </div>
+            ) : multiProgress ? (
+              <div style={{ padding: '24px 0' }}>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: '#065f46', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Loader2 size={16} color="#00756a" style={{ animation: 'spin 1s linear infinite' }} />
+                    Uploading {multiProgress.current} of {multiProgress.total}…
+                  </span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>{multiProgress.current}/{multiProgress.total}</span>
+                </div>
+                <div style={{ height: 8, background: '#d1fae5', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
+                  <div style={{ height: '100%', background: '#00756a', borderRadius: 6, width: `${Math.round((multiProgress.current / multiProgress.total) * 100)}%`, transition: 'width 0.3s' }} />
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{multiProgress.name}</div>
               </div>
             ) : isPending ? (
               <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -1141,11 +1207,15 @@ export default function SubmitCandidatePage() {
                     transition: 'all 0.2s', marginBottom: 20,
                   }}
                 >
-                  <input ref={fileInputRef} type="file" hidden accept=".pdf,.doc,.docx,.zip" onChange={e => handleFiles(e.target.files)} />
+                  <input ref={fileInputRef} type="file" hidden multiple accept=".pdf,.doc,.docx,.zip" onChange={e => handleFiles(e.target.files)} />
                   <Upload size={40} color="#00756a" style={{ marginBottom: 14, opacity: 0.7 }} />
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Click to browse or drag & drop</div>
-                  <div style={{ fontSize: 13, color: '#9ca3af' }}>PDF · DOC · DOCX · ZIP (bulk)</div>
+                  <div style={{ fontSize: 13, color: '#9ca3af' }}>PDF · DOC · DOCX (multi-select OK) · ZIP (bulk)</div>
                 </div>
+
+                {uploadError && !done && (
+                  <div style={{ marginBottom: 12, padding: '10px 14px', background: uploadError.includes('❌') ? '#fee2e2' : '#fef3c7', color: uploadError.includes('❌') ? '#dc2626' : '#92400e', borderRadius: 8, fontSize: 13, whiteSpace: 'pre-line', lineHeight: 1.7 }}>{uploadError}</div>
+                )}
 
                 {files.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
@@ -1154,7 +1224,7 @@ export default function SubmitCandidatePage() {
                         <FileText size={16} color="#00756a" />
                         <span style={{ fontSize: 13, color: '#065f46', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                         <span style={{ fontSize: 11, color: '#6b7280' }}>{(f.size / 1024).toFixed(0)} KB</span>
-                        <button onClick={() => setFiles([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}>
+                        <button onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}>
                           <X size={14} />
                         </button>
                       </div>
@@ -1172,7 +1242,7 @@ export default function SubmitCandidatePage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}
                 >
-                  <Upload size={16} /> Upload & Submit
+                  <Upload size={16} /> Upload {files.length > 1 ? `${files.length} Resumes` : '& Submit'}
                 </button>
               </>
             )}
