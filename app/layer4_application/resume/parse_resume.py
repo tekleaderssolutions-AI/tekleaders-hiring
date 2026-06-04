@@ -98,20 +98,35 @@ class ParseResumeUseCase:
             
             res = await self.db.execute(select(AgentRunModel).where(AgentRunModel.id == run_id))
             agent_run = res.scalar_one_or_none()
-            
+
             if not agent_run:
                 agent_run = AgentRunModel(id=run_id, workflow_name="resume_ingestion", status="running", metadata_json={"filename": filename})
                 self.db.add(agent_run)
                 await self.db.flush()
+            else:
+                # Clear any stale contact_extraction checkpoint from previous failed runs
+                # so it always re-runs on fresh raw_text (parser improvements would otherwise
+                # be invisible because the old cached result would be reused).
+                from sqlalchemy import delete as _delete
+                await self.db.execute(
+                    _delete(AgentStepModel)
+                    .where(AgentStepModel.run_id == run_id)
+                    .where(AgentStepModel.step_name == "contact_extraction")
+                )
 
             # ── 17-STAGE PIPELINE WITH CHECKPOINTS ───────────────────────────
 
-            # Stage 1: Regex contact extraction — BEFORE redaction or LLM
-            # Name, email, phone are captured here so they never reach OpenAI.
-            async def run_contact_extraction():
-                return TextProcessor.extract_contact_info(raw_text)
+            # Stage 1: Regex contact extraction — always runs fresh (never checkpointed).
+            # It's pure regex (fast), depends on raw_text quality which can improve across
+            # deploys, and a stale cached result with email=None would permanently block the
+            # resume from ever parsing successfully on retry.
+            contact_data = TextProcessor.extract_contact_info(raw_text)
 
-            contact_data = await self._get_or_run_step(run_id, "contact_extraction", run_contact_extraction)
+            # If email is missing (resume doesn't include one), generate a stable synthetic
+            # address from the content hash so the pipeline can still complete.
+            if not contact_data.get("email"):
+                contact_data["email"] = f"resume_{content_hash[:16]}@noemail.hirix"
+                print(f"[parse_resume] No email found in resume — using synthetic: {contact_data['email']}")
 
             # Stage 2: Clean + Redact (strips name, email, phone, URLs from text)
             async def run_prep():
