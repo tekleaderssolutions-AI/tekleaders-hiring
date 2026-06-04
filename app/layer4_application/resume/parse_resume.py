@@ -121,7 +121,7 @@ class ParseResumeUseCase:
             contact_data = TextProcessor.extract_contact_info(raw_text)
 
             if not contact_data.get("email"):
-                return {"error": "No email address found in this resume. Please ensure the resume contains a valid email address and re-upload."}
+                contact_data["email"] = f"resume_{content_hash[:16]}@noemail.hirix"
 
             # Stage 2: Clean + Redact (strips name, email, phone, URLs from text)
             async def run_prep():
