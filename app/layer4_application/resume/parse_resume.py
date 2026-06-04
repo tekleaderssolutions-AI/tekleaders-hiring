@@ -117,16 +117,11 @@ class ParseResumeUseCase:
             # ── 17-STAGE PIPELINE WITH CHECKPOINTS ───────────────────────────
 
             # Stage 1: Regex contact extraction — always runs fresh (never checkpointed).
-            # It's pure regex (fast), depends on raw_text quality which can improve across
-            # deploys, and a stale cached result with email=None would permanently block the
-            # resume from ever parsing successfully on retry.
+            # Pure regex (fast), depends on raw_text quality which can improve across deploys.
             contact_data = TextProcessor.extract_contact_info(raw_text)
 
-            # If email is missing (resume doesn't include one), generate a stable synthetic
-            # address from the content hash so the pipeline can still complete.
             if not contact_data.get("email"):
-                contact_data["email"] = f"resume_{content_hash[:16]}@noemail.hirix"
-                print(f"[parse_resume] No email found in resume — using synthetic: {contact_data['email']}")
+                return {"error": "No email address found in this resume. Please ensure the resume contains a valid email address and re-upload."}
 
             # Stage 2: Clean + Redact (strips name, email, phone, URLs from text)
             async def run_prep():
