@@ -111,6 +111,12 @@ class PostgresCandidateRepository:
         result = await self.session.execute(select(CandidateModel).limit(limit).offset(offset))
         return result.scalars().all()
 
+    async def get_by_id(self, candidate_id: str) -> Optional[CandidateModel]:
+        result = await self.session.execute(
+            select(CandidateModel).where(CandidateModel.id == candidate_id)
+        )
+        return result.scalar_one_or_none()
+
     async def count_candidates(self) -> int:
         """
         Returns total count of candidates for progress tracking.

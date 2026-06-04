@@ -13,23 +13,26 @@ from app.layer6_data.repositories_impl.resume.postgres_candidate_repo import Pos
 router = APIRouter(prefix="/candidates", tags=["Candidates"])
 
 
-async def _create_submission_from_resume(db, resume_id: str, job_id: str, user_id: str, company_id: str):
-    """Create a CandidateSubmissionModel after a resume is parsed, if not already submitted."""
+async def _create_submission_from_resume(db, resume_id: str, job_id: str, user_id: str, company_id: str) -> dict:
+    """Create a CandidateSubmissionModel after a resume is parsed, if not already submitted.
+    Returns a status dict: {"status": "created"|"duplicate_self"|"ok"}
+    """
     from app.layer6_data.models.resume.resume_model import ResumeModel
     from app.layer6_data.models.resume.candidate_model import CandidateModel
     from app.layer6_data.models.candidate_submission_model import CandidateSubmissionModel, SubmissionStatus
+    from app.layer6_data.models.user_model import UserModel
 
     res = await db.execute(select(ResumeModel).where(ResumeModel.id == resume_id))
     resume = res.scalar_one_or_none()
     if not resume:
-        return
+        return {"status": "ok"}
 
     cand_res = await db.execute(select(CandidateModel).where(CandidateModel.id == resume.candidate_id))
     candidate = cand_res.scalar_one_or_none()
     if not candidate:
-        return
+        return {"status": "ok"}
 
-    # Skip if this recruiter already submitted this candidate for this job
+    # Already submitted by this recruiter
     existing = await db.execute(
         select(CandidateSubmissionModel)
         .where(CandidateSubmissionModel.job_id == job_id)
@@ -38,7 +41,29 @@ async def _create_submission_from_resume(db, resume_id: str, job_id: str, user_i
         .where(CandidateSubmissionModel.status != SubmissionStatus.WITHDRAWN)
     )
     if existing.scalar_one_or_none():
-        return
+        return {
+            "status": "duplicate_self",
+            "message": f"{candidate.first_name or ''} {candidate.last_name or ''}".strip() or candidate.email,
+        }
+
+    # Already submitted by a different recruiter
+    other = await db.execute(
+        select(CandidateSubmissionModel, UserModel)
+        .join(UserModel, UserModel.id == CandidateSubmissionModel.submitted_by)
+        .where(CandidateSubmissionModel.job_id == job_id)
+        .where(CandidateSubmissionModel.candidate_email == candidate.email)
+        .where(CandidateSubmissionModel.submitted_by != user_id)
+        .where(CandidateSubmissionModel.status != SubmissionStatus.WITHDRAWN)
+    )
+    other_row = other.first()
+    if other_row:
+        other_user = other_row[1]
+        other_name = f"{other_user.first_name or ''} {other_user.last_name or ''}".strip() or "another recruiter"
+        return {
+            "status": "duplicate_other",
+            "message": f"{candidate.first_name or ''} {candidate.last_name or ''}".strip() or candidate.email,
+            "submitted_by": other_name,
+        }
 
     metadata = resume.metadata_json or {}
     seniority = metadata.get("seniority", {})
@@ -78,7 +103,8 @@ async def process_bulk_resumes(content: bytes, user_id: str, session_id: str = N
             for r in results:
                 if r.get("status") == "success" and r.get("id"):
                     try:
-                        await _create_submission_from_resume(db, r["id"], job_id, user_id, company_id)
+                        sub_st = await _create_submission_from_resume(db, r["id"], job_id, user_id, company_id)
+                        r["submission"] = sub_st
                     except Exception as e:
                         print(f"[bulk submission] skipping {r.get('id')}: {e}")
             await db.commit()
@@ -167,10 +193,11 @@ async def upload_resumes(
     # Auto-create submission record so dashboard counts update immediately.
     # Use a fresh session — execute_single already committed the request session mid-way,
     # which leaves get_db's managed transaction in an invalid state for further writes.
+    sub_status = None
     if job_id and result.get("resume_id"):
         try:
             async with AsyncSessionLocal() as sub_db:
-                await _create_submission_from_resume(
+                sub_status = await _create_submission_from_resume(
                     sub_db, result["resume_id"], job_id, current_user.id, current_user.company_id
                 )
                 await sub_db.commit()
@@ -179,7 +206,8 @@ async def upload_resumes(
 
     return {
         "mode": "single",
-        "data": result
+        "data": result,
+        "submission": sub_status,
     }
 
 def _compute_experience_years(work_experience: list) -> float | None:
@@ -390,15 +418,97 @@ async def get_candidate_stats(
 
 @router.get(
     "/{candidate_id}",
-    summary="Get candidate details by ID"
+    summary="Get full candidate profile by ID"
 )
 async def get_candidate(
     candidate_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    repo = PostgresCandidateRepository(db)
-    candidate = await repo.get_by_id(candidate_id)
+    from sqlalchemy import select, func, and_
+    from app.layer6_data.models.resume.candidate_model import CandidateModel
+    from app.layer6_data.models.resume.resume_model import ResumeModel
+    from app.layer6_data.models.user_model import UserModel
+    from app.layer6_data.models.candidate_submission_model import CandidateSubmissionModel
+    from app.layer6_data.models.jd.job_model import JobModel
+
+    cand_res = await db.execute(
+        select(CandidateModel).where(CandidateModel.id == candidate_id)
+    )
+    candidate = cand_res.scalar_one_or_none()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    return candidate
+
+    # Latest resume
+    latest_sq = (
+        select(func.max(ResumeModel.created_at).label("max_at"))
+        .where(ResumeModel.candidate_id == candidate_id)
+        .scalar_subquery()
+    )
+    res_res = await db.execute(
+        select(ResumeModel)
+        .where(ResumeModel.candidate_id == candidate_id)
+        .where(ResumeModel.created_at == latest_sq)
+    )
+    resume = res_res.scalar_one_or_none()
+
+    # Uploader name
+    added_by_name = None
+    if resume and resume.uploaded_by:
+        u_res = await db.execute(select(UserModel).where(UserModel.id == resume.uploaded_by))
+        uploader = u_res.scalar_one_or_none()
+        if uploader:
+            added_by_name = f"{uploader.first_name or ''} {uploader.last_name or ''}".strip()
+
+    # Job submissions
+    sub_res = await db.execute(
+        select(
+            CandidateSubmissionModel.id,
+            CandidateSubmissionModel.submitted_at,
+            CandidateSubmissionModel.status,
+            CandidateSubmissionModel.submitted_by,
+            JobModel.id.label("job_id"),
+            JobModel.current_title,
+            JobModel.job_code,
+            (UserModel.first_name + " " + UserModel.last_name).label("recruiter_name"),
+        )
+        .join(JobModel, JobModel.id == CandidateSubmissionModel.job_id)
+        .outerjoin(UserModel, UserModel.id == CandidateSubmissionModel.submitted_by)
+        .where(CandidateSubmissionModel.candidate_id == candidate_id)
+        .order_by(CandidateSubmissionModel.submitted_at.desc())
+    )
+    submissions = sub_res.all()
+
+    metadata = (resume.metadata_json or {}) if resume else {}
+    seniority = metadata.get("seniority", {})
+
+    return {
+        "id": candidate.id,
+        "first_name": candidate.first_name,
+        "last_name": candidate.last_name,
+        "email": candidate.email,
+        "phone": candidate.phone,
+        "linkedin_url": candidate.linkedin_url,
+        "created_at": candidate.created_at.isoformat() if candidate.created_at else None,
+        "resume": {
+            "id": resume.id if resume else None,
+            "title": resume.title if resume else None,
+            "skills": resume.skills_json or [] if resume else [],
+            "experience": resume.experience_json or [] if resume else [],
+            "seniority": seniority,
+            "uploaded_by": added_by_name,
+            "experience_years": _compute_experience_years(resume.experience_json) or seniority.get("total_years"),
+        } if resume else None,
+        "submissions": [
+            {
+                "submission_id": s.id,
+                "job_id": s.job_id,
+                "job_title": s.current_title or s.job_code or "Untitled",
+                "job_code": s.job_code,
+                "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None,
+                "status": s.status,
+                "recruiter_name": s.recruiter_name,
+            }
+            for s in submissions
+        ],
+    }

@@ -83,9 +83,14 @@ class ParseResumeUseCase:
             if filename.lower().endswith(".pdf"):
                 from app.config import settings
                 raw_text = await PDFParser.extract_text_async(temp_path, api_key=settings.OPENAI_API_KEY)
+            elif filename.lower().endswith(".doc") and not filename.lower().endswith(".docx"):
+                return {"error": "Old .DOC format is not supported. Please save the file as .DOCX or .PDF and re-upload."}
             else:
                 raw_text = DocxParser.extract_text(temp_path)
-            
+
+            if not raw_text or not raw_text.strip():
+                return {"error": "Could not extract text from this file. The file may be empty, image-only, or password-protected."}
+
             content_hash = self.calculate_content_hash(raw_text)
             
             # Use content_hash as a stable reference for the Run ID to support resumption
